@@ -1,0 +1,21 @@
+extends layout
+
+block content
+  .chat-page
+    .chat-container
+      .chat-header
+        h1.chat-title= title
+        a.chat-link(href="/message/send") Nuevo mensaje
+
+      .chat-body
+        if mensajes.length === 0
+          .empty-chat
+            p No hay mensajes todavía.
+        else
+          each mensaje in mensajes
+            .message-row
+              .message-bubble
+                .message-meta
+                  span.message-user= mensaje.username
+                  span.message-time= mensaje.timestamp
+                p.message-text= mensaje.text

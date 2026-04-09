@@ -1,0 +1,14 @@
+extends layout
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+        a.chat-link(href="/message/inbox") Ver mensajes
+
+      .chat-body
+        form.chat-form(action="/message/send" method="POST")
+          input.chat-input(type="text" name="username" placeholder="Tu nombre de usuario" required)
+          textarea.chat-textarea(name="text" placeholder="Escribe un mensaje" required)
+          button.chat-button(type="submit") Enviar
