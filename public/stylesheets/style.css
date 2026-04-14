@@ -43,11 +43,19 @@ a {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .chat-title {
   margin: 0;
   font-size: 1.8rem;
+}
+
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .chat-link {
@@ -60,6 +68,14 @@ a {
 
 .chat-link:hover {
   background: #37454d;
+}
+
+.chat-link.secondary {
+  background: #00a884;
+}
+
+.chat-link.secondary:hover {
+  background: #008f72;
 }
 
 .chat-body {
@@ -79,27 +95,6 @@ a {
   padding: 18px 22px;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.message-row {
-  display: flex;
-  justify-content: flex-start;
-}
-
-.message-bubble {
-  max-width: 70%;
-  background: #d9fdd3;
-  border-radius: 12px 12px 12px 4px;
-  padding: 10px 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
-}
-
-.message-meta {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
 }
 
 .message-user {
@@ -156,4 +151,92 @@ a {
 
 .chat-button:hover {
   background: #008f72;
+}
+
+.auth-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #667781;
+}
+
+.session-user {
+  background: #2a3942;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+.user-badge {
+  background: #ffffff;
+  border-left: 4px solid #00a884;
+  padding: 12px 14px;
+  border-radius: 10px;
+  color: #111b21;
+}
+
+.error-box {
+  background: #ffe3e3;
+  color: #9f1d1d;
+  border: 1px solid #f5b5b5;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.message-row {
+  display: flex;
+  width: 100%;
+}
+
+.message-row.mine {
+  justify-content: flex-end;
+}
+
+.message-row.theirs {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+.mine-bubble {
+  background: #dcf8c6;
+  border-radius: 12px 12px 4px 12px;
+}
+
+.theirs-bubble {
+  background: #ffffff;
+  border-radius: 12px 12px 12px 4px;
+}
+
+.message-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.message-user {
+  font-weight: bold;
+  color: #111b21;
+}
+
+.message-time {
+  font-size: 0.8rem;
+  color: #667781;
+}
+
+.message-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.4;
+  word-break: break-word;
 }

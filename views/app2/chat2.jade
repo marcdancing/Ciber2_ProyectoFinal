@@ -1,0 +1,28 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container
+      .chat-header
+        h1.chat-title= title
+        .chat-actions
+          span.session-user Usuario: #{username}
+          a.chat-link(href='/message2/send') Nuevo mensaje
+          a.chat-link(href='/auth2/logout') Cerrar sesión
+
+      .chat-body
+        if !mensajes || mensajes.length === 0
+          .empty-chat
+            p No tienes mensajes todavía.
+        else
+          each mensaje in mensajes
+            - const esMio = mensaje.from === username
+            .message-row(class=esMio ? 'mine' : 'theirs')
+              .message-bubble(class=esMio ? 'mine-bubble' : 'theirs-bubble')
+                .message-meta
+                  if esMio
+                    span.message-user Para: #{mensaje.to}
+                  else
+                    span.message-user De: #{mensaje.from}
+                  span.message-time= mensaje.timestamp
+                p.message-text= mensaje.text

@@ -1,0 +1,22 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+        a.chat-link(href='/message2/inbox') Ver inbox
+
+      .chat-body
+        form.chat-form(action='/message2/send' method='POST')
+          .user-badge
+            | Enviando como 
+            strong= username
+
+          select.chat-input(name='to' required)
+            option(value='') Selecciona destinatario
+            each usuario in usuarios
+              option(value=usuario.username)= usuario.username
+
+          textarea.chat-textarea(name='text' placeholder='Escribe tu mensaje' required)
+          button.chat-button(type='submit') Enviar mensaje
