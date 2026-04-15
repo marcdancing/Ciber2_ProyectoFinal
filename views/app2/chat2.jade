@@ -7,13 +7,13 @@ block content
         h1.chat-title= title
         .chat-actions
           span.session-user Usuario: #{username}
-          a.chat-link(href='/message2/send') Nuevo mensaje
+          a.chat-link(href='/message2/inbox') Volver
           a.chat-link(href='/auth2/logout') Cerrar sesión
 
       .chat-body
         if !mensajes || mensajes.length === 0
           .empty-chat
-            p No tienes mensajes todavía.
+            p No hay mensajes todavía en esta conversación.
         else
           each mensaje in mensajes
             - const esMio = mensaje.from === username
@@ -21,8 +21,18 @@ block content
               .message-bubble(class=esMio ? 'mine-bubble' : 'theirs-bubble')
                 .message-meta
                   if esMio
-                    span.message-user Para: #{mensaje.to}
+                    span.message-user Tú
                   else
-                    span.message-user De: #{mensaje.from}
+                    span.message-user= mensaje.from
                   span.message-time= mensaje.timestamp
                 p.message-text= mensaje.text
+
+      .chat-footer
+        form.chat-send-form(action=`/message2/chat/${otroUsuario}` method='POST')
+          input.chat-send-input(
+            type='text'
+            name='text'
+            placeholder=`Escribe un mensaje a ${otroUsuario}`
+            required
+          )
+          button.chat-send-button(type='submit') Enviar
