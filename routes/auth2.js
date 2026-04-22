@@ -21,7 +21,8 @@ router.post('/login', async (req, res) => {
         console.log('Usuario encontrado: ', user);
 
         if (!user) {
-            return res.send('Usuario o contraseña incorrectos');
+            req.session.error = 'Usuario o contraseña incorrectos';
+            return res.redirect('/auth2/login');
         }
 
         req.session.user = {
@@ -67,5 +68,17 @@ router.post('/register', async (req, res) => {
         res.status(500).send('Error en el registro');
     }
 });
+
+router.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) {
+            console.error(err);
+            return res.redirect('/message2/inbox');
+        }
+
+        res.redirect('/auth2/login');
+    });
+});
+
 
 module.exports = router;

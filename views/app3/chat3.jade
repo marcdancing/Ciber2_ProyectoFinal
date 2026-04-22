@@ -1,0 +1,92 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container
+      .chat-header
+        h1.chat-title= title
+        .chat-actions
+          span.session-user Usuario: #{username}
+          a.chat-link(href='/message3/inbox') Volver
+          a.chat-link(href='/auth3/logout') Cerrar sesión
+
+      .chat-body
+        if error
+          .error-box= error
+
+        if !mensajes || mensajes.length === 0
+          .empty-chat
+            p No hay mensajes todavía en esta conversación.
+        else
+          each mensaje in mensajes
+            - const esMio = mensaje.from === username
+            .message-row(class=esMio ? 'mine' : 'theirs')
+              .message-bubble(class=esMio ? 'mine-bubble' : 'theirs-bubble')
+                .message-meta
+                  if esMio
+                    span.message-user Tú
+                  else
+                    span.message-user= mensaje.from
+                  span.message-time= mensaje.timestamp
+                p.message-text= mensaje.text
+
+      .chat-footer
+        form.chat-send-form(action=`/message3/chat/${otroUsuario}` method='POST')
+          .chat-send-wrapper
+            input.chat-send-input(
+              type='text'
+              name='text'
+              id='messageInput'
+              placeholder=`Escribe un mensaje a ${otroUsuario}`
+              maxlength='200'
+              required
+            )
+            .char-counter#charCounter
+              span#charCount 0
+              | /200
+            .limit-warning#limitWarning Has alcanzado el límite de 200 caracteres
+          button#sendButton.chat-send-button(type='submit') Enviar
+
+  script.
+    const messageInput = document.getElementById('messageInput');
+    const charCount = document.getElementById('charCount');
+    const charCounter = document.getElementById('charCounter');
+    const limitWarning = document.getElementById('limitWarning');
+    const sendButton = document.getElementById('sendButton');
+
+    if (messageInput && charCount && charCounter && limitWarning && sendButton) {
+      const LIMIT = 200;
+
+      const updateCounter = () => {
+        const length = messageInput.value.length;
+        charCount.textContent = length;
+
+        charCounter.classList.remove('warning', 'danger');
+        messageInput.classList.remove('input-warning', 'input-danger');
+        limitWarning.classList.remove('show');
+
+        sendButton.disabled = false;
+
+        if (length >= 180 && length < LIMIT) {
+          charCounter.classList.add('warning');
+          messageInput.classList.add('input-warning');
+        }
+
+        if (length >= LIMIT) {
+          charCounter.classList.add('danger');
+          messageInput.classList.add('input-danger');
+          limitWarning.classList.add('show');
+          sendButton.disabled = true;
+        }
+      };
+
+      messageInput.addEventListener('input', updateCounter);
+
+      messageInput.form.addEventListener('submit', (e) => {
+        if (messageInput.value.length >= LIMIT) {
+          e.preventDefault();
+        }
+      });
+
+      updateCounter();
+    }

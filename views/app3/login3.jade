@@ -1,0 +1,17 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+        a.chat-link(href='/auth3/register') Crear cuenta
+
+      .chat-body
+        if error
+          .error-box= error
+
+        form.chat-form(action='/auth3/login' method='POST')
+          input.chat-input(type='text' name='username' placeholder='Nombre de usuario' required)
+          input.chat-input(type='password' name='password' placeholder='Contraseña' required)
+          button.chat-button(type='submit') Iniciar sesión

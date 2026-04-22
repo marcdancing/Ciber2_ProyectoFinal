@@ -45,7 +45,8 @@ router.get('/chat/:username', requireAuth, async (req, res) => {
             title: `Chat con ${otroUsuario}`,
             username: req.session.user.username,
             otroUsuario,
-            mensajes
+            mensajes,
+            error: req.session.error
         });
     } catch (error) {
         console.error(error);
@@ -60,6 +61,11 @@ router.post('/chat/:username', requireAuth, async (req, res) => {
         const text = req.body?.text?.trim();
 
         if (!text) {
+            return res.redirect(`/message2/chat/${otroUsuario}`);
+        }
+
+        if (text.length > 200) {
+            req.session.error = 'El mensaje no puede exceder los 200 caracteres';
             return res.redirect(`/message2/chat/${otroUsuario}`);
         }
 

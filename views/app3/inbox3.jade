@@ -1,0 +1,21 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container
+      .chat-header
+        h1.chat-title= title
+        .chat-actions
+          span.session-user Usuario: #{username}
+          a.chat-link(href='/auth3/logout') Cerrar sesión
+
+      .chat-body
+        if !usuarios || usuarios.length === 0
+          .empty-chat
+            p No hay usuarios disponibles.
+        else
+          .contacts-list
+            each usuario in usuarios
+              a.contact-card(href=`/message3/chat/${usuario.username}`)
+                .contact-name= usuario.username
+                .contact-email= usuario.email

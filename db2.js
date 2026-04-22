@@ -1,12 +1,18 @@
 const mongoose = require('mongoose');
 
+let db2;
+
 async function connectDB2() {
   try {
-    await mongoose.connect('mongodb://127.0.0.1:27017/chatApp');
-    console.log('Conexión a MongoDB exitosa');
+    db2 = await mongoose.createConnection('mongodb://127.0.0.1:27017/chatApp').asPromise();
+    console.log('Conexión a MongoDB App 2 exitosa');
   } catch (error) {
-    console.error('Error al conectar con MongoDB:', error);
+    console.error('Error al conectar con MongoDB App 2:', error);
   }
 }
 
-module.exports = connectDB2;
+function getDB2() {
+  return db2;
+}
+
+module.exports = { connectDB2, getDB2 };

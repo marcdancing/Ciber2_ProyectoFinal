@@ -6,9 +6,11 @@
     "start": "node ./bin/www"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "express": "~4.16.1",
+    "express-rate-limit": "^8.3.2",
     "express-session": "^1.19.0",
     "http-errors": "~1.6.3",
     "jade": "~1.11.0",
