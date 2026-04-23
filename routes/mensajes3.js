@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Message3 = require('../models/message3');
+const getMessage3Model = require('../models/message3');
 const getUser3Model = require('../models/User3');
 const { encryptMessage, decryptMessage } = require('../utils/crypto3');
 
@@ -11,6 +11,42 @@ function requireAuth3(req, res, next) {
   }
   next();
 }
+
+router.post('/chat/:username', requireAuth3, async (req, res) => {
+  try {
+    const Message3 = getMessage3Model();
+    const otroUsuario = req.params.username;
+    const text = req.body?.text?.trim();
+
+    if (!text) {
+      req.session.error = 'El mensaje no puede estar vacío';
+      return res.redirect(`/message3/chat/${otroUsuario}`);
+    }
+
+    if (text.length > 200) {
+      req.session.error = 'El mensaje no puede superar los 200 caracteres';
+      return res.redirect(`/message3/chat/${otroUsuario}`);
+    }
+
+    const encrypted = encryptMessage(text);
+
+    const nuevoMensaje = new Message3({
+      from: req.session.user3.username,
+      to: otroUsuario,
+      ciphertext: encrypted.ciphertext,
+      iv: encrypted.iv,
+      authTag: encrypted.authTag,
+      timestamp: new Date().toLocaleString()
+    });
+
+    await nuevoMensaje.save();
+
+    res.redirect(`/message3/chat/${otroUsuario}`);
+  } catch (error) {
+    console.error('ERROR EN POST /message3/chat/:username:', error);
+    res.status(500).send('Error al enviar mensaje');
+  }
+});
 
 // Lista de usuarios disponibles
 router.get('/inbox', requireAuth3, async (req, res) => {
@@ -35,6 +71,7 @@ router.get('/inbox', requireAuth3, async (req, res) => {
 // Ver chat con un usuario concreto
 router.get('/chat/:username', requireAuth3, async (req, res) => {
   try {
+    const Message3 = getMessage3Model();
     const otroUsuario = req.params.username;
 
     const mensajesDB = await Message3.find({
@@ -78,39 +115,53 @@ router.get('/chat/:username', requireAuth3, async (req, res) => {
 });
 
 // Enviar mensaje cifrado
-router.post('/chat/:username', requireAuth3, async (req, res) => {
+router.get('/chat/:username', requireAuth3, async (req, res) => {
   try {
     const otroUsuario = req.params.username;
-    const text = req.body?.text?.trim();
+    console.log('Abriendo chat con:', otroUsuario);
+    console.log('Usuario en sesión:', req.session.user3);
 
-    if (!text) {
-      req.session.error = 'El mensaje no puede estar vacío';
-      return res.redirect(`/message3/chat/${otroUsuario}`);
-    }
+    const mensajesDB = await Message3.find({
+      $or: [
+        { from: req.session.user3.username, to: otroUsuario },
+        { from: otroUsuario, to: req.session.user3.username }
+      ]
+    }).sort({ _id: 1 });
 
-    if (text.length > 200) {
-      req.session.error = 'El mensaje no puede superar los 200 caracteres';
-      return res.redirect(`/message3/chat/${otroUsuario}`);
-    }
+    console.log('Mensajes en BD:', mensajesDB);
 
-    const encrypted = encryptMessage(text);
+    const mensajes = mensajesDB.map((msg) => {
+      let text = '[Error al descifrar mensaje]';
 
-    const nuevoMensaje = new Message3({
-      from: req.session.user3.username,
-      to: otroUsuario,
-      ciphertext: encrypted.ciphertext,
-      iv: encrypted.iv,
-      authTag: encrypted.authTag,
-      timestamp: new Date().toLocaleString()
+      try {
+        text = decryptMessage(msg.ciphertext, msg.iv, msg.authTag);
+      } catch (e) {
+        console.error('Error al descifrar mensaje:', e);
+      }
+
+      return {
+        from: msg.from,
+        to: msg.to,
+        text,
+        timestamp: msg.timestamp
+      };
     });
 
-    await nuevoMensaje.save();
+    const error = req.session.error || null;
+    req.session.error = null;
 
-    res.redirect(`/message3/chat/${otroUsuario}`);
+    res.render('app3/chat3', {
+      title: `Chat con ${otroUsuario}`,
+      username: req.session.user3.username,
+      otroUsuario,
+      mensajes,
+      error
+    });
   } catch (error) {
-    console.error('ERROR EN POST /message3/chat/:username:', error);
-    res.status(500).send('Error al enviar mensaje');
+    console.error('ERROR EN /message3/chat/:username:', error);
+    res.status(500).send('Error al cargar el chat');
   }
 });
+
 
 module.exports = router;

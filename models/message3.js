@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { getDB3 } = require('../db3');
 
 const message3Schema = new mongoose.Schema({
   from: {
@@ -31,4 +32,14 @@ const message3Schema = new mongoose.Schema({
   collection: 'mensajes3'
 });
 
-module.exports = mongoose.model('Message3', message3Schema);
+function getMessage3Model() {
+  const db3 = getDB3();
+
+  if (!db3) {
+    throw new Error('La conexión db3 todavía no está inicializada');
+  }
+
+  return db3.models.Message3 || db3.model('Message3', message3Schema);
+}
+
+module.exports = getMessage3Model;
