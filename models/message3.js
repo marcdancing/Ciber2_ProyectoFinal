@@ -20,7 +20,11 @@ const message3Schema = new mongoose.Schema({
     type: String,
     required: true
   },
-  authTag: {
+  encryptedKeyForRecipient: {
+    type: String,
+    required: true
+  },
+  encryptedKeyForSender: {
     type: String,
     required: true
   },

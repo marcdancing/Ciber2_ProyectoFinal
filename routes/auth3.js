@@ -4,6 +4,14 @@ const rateLimit = require('express-rate-limit');
 const router = express.Router();
 const getUser3Model = require('../models/User3');
 
+function requireAuth3(req, res, next) {
+  if (!req.session.user3) {
+    req.session.error = 'Debes iniciar sesión para acceder a esta página';
+    return res.redirect('/auth3/login');
+  }
+  next();
+}
+
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -124,6 +132,48 @@ router.post('/register', async (req, res) => {
     console.error(error);
     req.session.error = 'Error al registrar el usuario';
     res.redirect('/auth3/register');
+  }
+});
+
+router.post('/public-key', requireAuth3, async (req, res) => {
+  try {
+    const User3 = getUser3Model();
+    const publicKey = req.body?.publicKey;
+
+    if (!publicKey) {
+      return res.status(400).json({ error: 'Falta la clave pública' });
+    }
+
+    await User3.updateOne(
+      { _id: req.session.user3.id },
+      { $set: { publicKey } }
+    );
+
+    res.json({ ok: true });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error guardando la clave pública' });
+  }
+});
+
+router.get('/public-key/:username', requireAuth3, async (req, res) => {
+  try {
+    const User3 = getUser3Model();
+    const username = req.params.username?.trim().toLowerCase();
+
+    const user = await User3.findOne({ username });
+
+    if (!user || !user.publicKey) {
+      return res.status(404).json({ error: 'Clave pública no encontrada' });
+    }
+
+    res.json({
+      username: user.username,
+      publicKey: user.publicKey
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error obteniendo la clave pública' });
   }
 });
 

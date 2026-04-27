@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 
 // Usa una clave de 32 bytes derivada de una passphrase
-const SECRET = process.env.APP3_SECRET || 'clave-super-secreta-app3-cambiar';
+const SECRET = process.env.APP3_SECRET || 'v~Dx&/J.I+Inxo1xSbH`e>5!y[kb%d[W(R1ei£!G$H:6*59';
 const KEY = crypto.createHash('sha256').update(SECRET).digest(); // 32 bytes
 
 function encryptMessage(plainText) {

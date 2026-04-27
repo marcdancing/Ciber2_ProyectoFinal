@@ -14,33 +14,15 @@ block content
         if error
           .error-box= error
 
-        if !mensajes || mensajes.length === 0
-          .empty-chat
-            p No hay mensajes todavía en esta conversación.
-        else
-          each mensaje in mensajes
-            - const esMio = mensaje.from === username
-            .message-row(class=esMio ? 'mine' : 'theirs')
-              .message-bubble(class=esMio ? 'mine-bubble' : 'theirs-bubble')
-                .message-meta
-                  if esMio
-                    span.message-user Tú
-                  else
-                    span.message-user= mensaje.from
-                  span.message-time= mensaje.timestamp
-                p.message-text= mensaje.text
+        #messagesContainer
+          if !mensajes || mensajes.length === 0
+            .empty-chat
+              p No hay mensajes todavía en esta conversación.
 
       .chat-footer
-        form.chat-send-form(action=`/message3/chat/${otroUsuario}` method='POST')
+        form#chatForm.chat-send-form
           .chat-send-wrapper
-            input.chat-send-input(
-              type='text'
-              name='text'
-              id='messageInput'
-              placeholder=`Escribe un mensaje a ${otroUsuario}`
-              maxlength='200'
-              required
-            )
+            input.chat-send-input(type='text' name='text' id='messageInput' placeholder=`Escribe un mensaje a ${otroUsuario}` maxlength='200' required)
             .char-counter#charCounter
               span#charCount 0
               | /200
@@ -48,15 +30,265 @@ block content
           button#sendButton.chat-send-button(type='submit') Enviar
 
   script.
+    const CURRENT_USER = !{JSON.stringify(username)};
+    const OTHER_USER = !{JSON.stringify(otroUsuario)};
+    const RAW_MESSAGES = !{JSON.stringify(mensajes || [])};
+
     const messageInput = document.getElementById('messageInput');
     const charCount = document.getElementById('charCount');
     const charCounter = document.getElementById('charCounter');
     const limitWarning = document.getElementById('limitWarning');
     const sendButton = document.getElementById('sendButton');
+    const chatForm = document.getElementById('chatForm');
+    const messagesContainer = document.getElementById('messagesContainer');
+    const LIMIT = 200;
+
+    function openKeyDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('App3KeyStore', 1);
+
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains('keys')) {
+            db.createObjectStore('keys');
+          }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function saveKey(name, key) {
+      const db = await openKeyDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('keys', 'readwrite');
+        tx.objectStore('keys').put(key, name);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function getKey(name) {
+      const db = await openKeyDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('keys', 'readonly');
+        const request = tx.objectStore('keys').get(name);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function strToArrayBuffer(str) {
+      return new TextEncoder().encode(str);
+    }
+
+    function arrayBufferToStr(buffer) {
+      return new TextDecoder().decode(buffer);
+    }
+
+    function abToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+
+    function base64ToAb(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes.buffer;
+    }
+
+    async function exportPublicKey(key) {
+      const spki = await crypto.subtle.exportKey('spki', key);
+      return abToBase64(spki);
+    }
+
+    async function importPublicKey(base64) {
+      return crypto.subtle.importKey(
+        'spki',
+        base64ToAb(base64),
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        true,
+        ['encrypt']
+      );
+    }
+
+    async function getOrCreateKeyPair() {
+      const privName = `priv_${CURRENT_USER}`;
+      const pubName = `pub_${CURRENT_USER}`;
+
+      const privateKey = await getKey(privName);
+      const publicKey = await getKey(pubName);
+
+      if (privateKey && publicKey) {
+        console.log('Claves cargadas de IndexedDB');
+        return { privateKey, publicKey };
+      }
+
+      console.log('Generando nuevas claves...');
+
+      const keyPair = await crypto.subtle.generateKey(
+        {
+          name: 'RSA-OAEP',
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: 'SHA-256'
+        },
+        true,
+        ['encrypt', 'decrypt']
+      );
+
+      await saveKey(privName, keyPair.privateKey);
+      await saveKey(pubName, keyPair.publicKey);
+
+      const pubBase64 = await exportPublicKey(keyPair.publicKey);
+
+      await fetch('/auth3/public-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ publicKey: pubBase64 })
+      });
+
+      return keyPair;
+    }
+
+    async function getRecipientPublicKey(username) {
+      const res = await fetch(`/auth3/public-key/${username}`);
+      if (!res.ok) throw new Error('No se pudo obtener la clave pública');
+      const data = await res.json();
+      return importPublicKey(data.publicKey);
+    }
+
+    async function encryptMessage(text, recipientPub, senderPub) {
+      const aesKey = await crypto.subtle.generateKey(
+        { name: 'AES-GCM', length: 256 },
+        true,
+        ['encrypt', 'decrypt']
+      );
+
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const ciphertext = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        aesKey,
+        strToArrayBuffer(text)
+      );
+
+      const rawKey = await crypto.subtle.exportKey('raw', aesKey);
+
+      const encRec = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, recipientPub, rawKey);
+      const encSend = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, senderPub, rawKey);
+
+      return {
+        ciphertext: abToBase64(ciphertext),
+        iv: abToBase64(iv.buffer),
+        encryptedKeyForRecipient: abToBase64(encRec),
+        encryptedKeyForSender: abToBase64(encSend)
+      };
+    }
+
+    async function decryptMessage(msg, privateKey) {
+      const keyData = msg.to === CURRENT_USER
+        ? msg.encryptedKeyForRecipient
+        : msg.encryptedKeyForSender;
+
+      const rawKey = await crypto.subtle.decrypt(
+        { name: 'RSA-OAEP' },
+        privateKey,
+        base64ToAb(keyData)
+      );
+
+      const aesKey = await crypto.subtle.importKey(
+        'raw',
+        rawKey,
+        { name: 'AES-GCM' },
+        false,
+        ['decrypt']
+      );
+
+      const text = await crypto.subtle.decrypt(
+        { name: 'AES-GCM', iv: new Uint8Array(base64ToAb(msg.iv)) },
+        aesKey,
+        base64ToAb(msg.ciphertext)
+      );
+
+      return arrayBufferToStr(text);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function render(messages) {
+      if (!messages.length) {
+        messagesContainer.innerHTML = '<div class="empty-chat"><p>No hay mensajes todavía en esta conversación.</p></div>';
+        return;
+      }
+
+      messagesContainer.innerHTML = messages.map(m => {
+        const mine = m.from === CURRENT_USER;
+        return `
+          <div class="message-row ${mine ? 'mine' : 'theirs'}">
+            <div class="message-bubble ${mine ? 'mine-bubble' : 'theirs-bubble'}">
+              <div class="message-meta">
+                <span class="message-user">${mine ? 'Tú' : escapeHtml(m.from)}</span>
+                <span class="message-time">${escapeHtml(m.timestamp)}</span>
+              </div>
+              <p class="message-text">${escapeHtml(m.text)}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function init() {
+      const keys = await getOrCreateKeyPair();
+      const recipientPub = await getRecipientPublicKey(OTHER_USER);
+
+      const decrypted = [];
+
+      for (const msg of RAW_MESSAGES) {
+        try {
+          const text = await decryptMessage(msg, keys.privateKey);
+          decrypted.push({ ...msg, text });
+        } catch {
+          decrypted.push({ ...msg, text: '[No se pudo descifrar]' });
+        }
+      }
+
+      render(decrypted);
+
+      chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const text = messageInput.value.trim();
+        if (!text || text.length >= LIMIT) return;
+
+        const enc = await encryptMessage(text, recipientPub, keys.publicKey);
+
+        const response = await fetch(`/message3/chat/${OTHER_USER}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(enc)
+        });
+
+        if (!response.ok) {
+          alert('Error al enviar el mensaje');
+          return;
+        }
+
+        location.reload();
+      });
+    }
 
     if (messageInput && charCount && charCounter && limitWarning && sendButton) {
-      const LIMIT = 200;
-
       const updateCounter = () => {
         const length = messageInput.value.length;
         charCount.textContent = length;
@@ -64,7 +296,6 @@ block content
         charCounter.classList.remove('warning', 'danger');
         messageInput.classList.remove('input-warning', 'input-danger');
         limitWarning.classList.remove('show');
-
         sendButton.disabled = false;
 
         if (length >= 180 && length < LIMIT) {
@@ -81,12 +312,10 @@ block content
       };
 
       messageInput.addEventListener('input', updateCounter);
-
-      messageInput.form.addEventListener('submit', (e) => {
-        if (messageInput.value.length >= LIMIT) {
-          e.preventDefault();
-        }
-      });
-
       updateCounter();
     }
+
+    init().catch(err => {
+      console.error('Error inicializando E2EE:', err);
+      messagesContainer.innerHTML = '<div class="empty-chat"><p>Error inicializando el cifrado.</p></div>';
+    });

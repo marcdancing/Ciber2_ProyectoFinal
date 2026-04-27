@@ -18,6 +18,10 @@ const user3Schema = new mongoose.Schema({
   password: {
     type: String,
     required: true
+  },
+  publicKey: {
+    type: String,
+    default: null
   }
 }, {
   collection: 'usuarios3'
