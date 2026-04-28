@@ -1,4 +1,4 @@
-extends ../layout
+extends ../layout3
 
 block content
   .chat-page
@@ -11,8 +11,187 @@ block content
         if error
           .error-box= error
 
-        form.chat-form(action='/auth3/register' method='POST')
-          input.chat-input(type='text' name='username' placeholder='Nombre de usuario' required)
+        form#registerForm.chat-form(action='/auth3/register' method='POST')
+          input.chat-input(type='text' name='username' id='username' placeholder='Nombre de usuario' required)
           input.chat-input(type='email' name='email' placeholder='Correo electrónico' required)
-          input.chat-input(type='password' name='password' placeholder='Contraseña (mínimo 8 caracteres)' required)
+          input.chat-input(type='password' name='password' id='password' placeholder='Contraseña (mínimo 8 caracteres)' required)
+          input(type='hidden' name='publicKey' id='publicKey')
           button.chat-button(type='submit') Registrarse
+
+        // ===== POPUP CERTIFICADO =====
+        #certRegisterModal.cert-modal.hidden
+          .cert-modal-content
+            h2 Generación del certificado criptográfico
+            p Para completar el registro se generará tu certificado personal de usuario.
+            p Este certificado contiene tu clave privada cifrada y será necesario para operar desde este u otros equipos autorizados.
+
+            ol
+              li Introduce una passphrase para proteger el certificado.
+              li Pulsa “Generar certificado”.
+              li Guarda el archivo descargado en un lugar seguro.
+              li Para usar otro equipo, importa este certificado.
+
+            p.cert-warning
+              | ⚠️ Si pierdes el certificado o la passphrase, NO podrás recuperar tus mensajes.
+
+            input#certPassphrase(type='password' placeholder='Passphrase del certificado')
+            button#generateCertButton.chat-button(type='button') Generar certificado y registrar
+
+  script.
+    const registerForm = document.getElementById('registerForm');
+    const certModal = document.getElementById('certRegisterModal');
+    const generateButton = document.getElementById('generateCertButton');
+    const passInput = document.getElementById('certPassphrase');
+    const publicKeyInput = document.getElementById('publicKey');
+    const usernameInput = document.getElementById('username');
+
+    let pendingSubmit = false;
+
+    function showCertModal() {
+      certModal.classList.remove('hidden');
+    }
+
+    function hideCertModal() {
+      certModal.classList.add('hidden');
+    }
+
+    function strToArrayBuffer(str) {
+      return new TextEncoder().encode(str);
+    }
+
+    function abToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      bytes.forEach(b => binary += String.fromCharCode(b));
+      return btoa(binary);
+    }
+
+    async function exportPublicKey(key) {
+      const spki = await crypto.subtle.exportKey('spki', key);
+      return abToBase64(spki);
+    }
+
+    async function exportPrivateKey(key) {
+      return crypto.subtle.exportKey('pkcs8', key);
+    }
+
+    async function deriveKey(passphrase, salt) {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        strToArrayBuffer(passphrase),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt,
+          iterations: 250000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        {
+          name: 'AES-GCM',
+          length: 256
+        },
+        false,
+        ['encrypt']
+      );
+    }
+
+    async function generateCertificate(username, passphrase) {
+      const keyPair = await crypto.subtle.generateKey(
+        {
+          name: 'RSA-OAEP',
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: 'SHA-256'
+        },
+        true,
+        ['encrypt', 'decrypt']
+      );
+
+      const publicKey = await exportPublicKey(keyPair.publicKey);
+      const privateKeyRaw = await exportPrivateKey(keyPair.privateKey);
+
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const aesKey = await deriveKey(passphrase, salt);
+
+      const encryptedPrivateKey = await crypto.subtle.encrypt(
+        { name: 'AES-GCM', iv },
+        aesKey,
+        privateKeyRaw
+      );
+
+      return {
+        username,
+        publicKey,
+        encryptedPrivateKey: abToBase64(encryptedPrivateKey),
+        salt: abToBase64(salt.buffer),
+        iv: abToBase64(iv.buffer),
+        algorithm: 'RSA-OAEP + AES-GCM + PBKDF2',
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    function downloadCertificate(cert) {
+      const blob = new Blob([JSON.stringify(cert, null, 2)], {
+        type: 'application/x-secmsg-certificate'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+
+      a.href = url;
+      a.download = `certificado-${cert.username}-app3.secmsg`;
+      a.style.display = 'none';
+
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    registerForm.addEventListener('submit', (e) => {
+      if (!pendingSubmit) {
+        e.preventDefault();
+        showCertModal();
+      }
+    });
+
+    generateButton.addEventListener('click', async (e) => {
+      e.preventDefault();
+
+      const passphrase = passInput.value.trim();
+      const username = usernameInput.value.trim().toLowerCase();
+
+      if (!passphrase) {
+        alert('Introduce una passphrase');
+        return;
+      }
+
+      try {
+        const cert = await generateCertificate(username, passphrase);
+
+        publicKeyInput.value = cert.publicKey;
+
+        downloadCertificate(cert);
+
+        setTimeout(() => {
+          pendingSubmit = true;
+          hideCertModal();
+          registerForm.submit();
+        }, 400);
+
+      } catch (err) {
+        console.error(err);
+        alert('Error generando certificado');
+      }
+    });

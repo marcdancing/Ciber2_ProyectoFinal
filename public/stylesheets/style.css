@@ -1,7 +1,4 @@
 
-
-
-
 body {
   margin: 0;
   font-family: Arial, sans-serif;
@@ -444,4 +441,84 @@ a {
   border-radius: 10px;
   margin-bottom: 14px;
   font-weight: 600;
+}
+
+.cert-modal.hidden {
+  display: none;
+}
+
+.cert-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.cert-modal-content {
+  background: white;
+  color: #111827;
+  max-width: 520px;
+  width: 100%;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+
+.cert-modal-content h2 {
+  margin-top: 0;
+}
+
+.cert-modal-content input {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+}
+
+.cert-warning {
+  color: #9f1d1d;
+  font-weight: 700;
+}
+
+.cert-modal.hidden {
+  display: none;
+}
+
+.cert-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.75);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+  padding: 20px;
+}
+
+.cert-modal-content {
+  background: white;
+  color: #111827;
+  max-width: 520px;
+  width: 100%;
+  border-radius: 18px;
+  padding: 28px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+}
+
+.cert-modal-content input {
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+}
+
+.cert-warning {
+  color: #9f1d1d;
+  font-weight: 700;
 }

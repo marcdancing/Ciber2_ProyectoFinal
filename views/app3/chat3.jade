@@ -1,4 +1,4 @@
-extends ../layout
+extends ../layout3
 
 block content
   .chat-page
@@ -13,6 +13,21 @@ block content
       .chat-body
         if error
           .error-box= error
+
+        #certModal.cert-modal.hidden
+          .cert-modal-content
+            h2 Certificado de usuario requerido
+            p Para acceder a tus mensajes cifrados necesitas importar tu certificado personal.
+            p Este certificado contiene tu clave privada cifrada. Sin él no podrás descifrar mensajes antiguos ni operar desde este equipo.
+            ol
+              li Selecciona tu archivo de certificado.
+              li Introduce la passphrase usada al generarlo.
+              li Pulsa “Importar certificado”.
+              li Una vez importado, este equipo quedará autorizado.
+            p.cert-warning Importante: si pierdes el certificado o la passphrase, no podrás recuperar tus mensajes cifrados.
+            input#certFile(type='file' accept='.json')
+            input#certPassphrase(type='password' placeholder='Passphrase del certificado')
+            button#installCertButton.chat-button(type='button') Importar certificado
 
         #messagesContainer
           if !mensajes || mensajes.length === 0
@@ -41,7 +56,21 @@ block content
     const sendButton = document.getElementById('sendButton');
     const chatForm = document.getElementById('chatForm');
     const messagesContainer = document.getElementById('messagesContainer');
+
+    const certModal = document.getElementById('certModal');
+    const certFile = document.getElementById('certFile');
+    const certPassphrase = document.getElementById('certPassphrase');
+    const installCertButton = document.getElementById('installCertButton');
+
     const LIMIT = 200;
+
+    function showCertModal() {
+      certModal.classList.remove('hidden');
+    }
+
+    function hideCertModal() {
+      certModal.classList.add('hidden');
+    }
 
     function openKeyDB() {
       return new Promise((resolve, reject) => {
@@ -118,7 +147,61 @@ block content
       );
     }
 
-    async function getOrCreateKeyPair() {
+    async function importPrivateKey(base64) {
+      return crypto.subtle.importKey(
+        'pkcs8',
+        base64ToAb(base64),
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        true,
+        ['decrypt']
+      );
+    }
+
+    async function deriveCertKey(passphrase, saltBase64) {
+      const passwordKey = await crypto.subtle.importKey(
+        'raw',
+        strToArrayBuffer(passphrase),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt: base64ToAb(saltBase64),
+          iterations: 250000,
+          hash: 'SHA-256'
+        },
+        passwordKey,
+        { name: 'AES-GCM', length: 256 },
+        false,
+        ['decrypt']
+      );
+    }
+
+    async function decryptPrivateKeyFromCertificate(cert, passphrase) {
+      const key = await deriveCertKey(passphrase, cert.salt);
+
+      const privateKeyRaw = await crypto.subtle.decrypt(
+        {
+          name: 'AES-GCM',
+          iv: new Uint8Array(base64ToAb(cert.iv))
+        },
+        key,
+        base64ToAb(cert.encryptedPrivateKey)
+      );
+
+      return crypto.subtle.importKey(
+        'pkcs8',
+        privateKeyRaw,
+        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        true,
+        ['decrypt']
+      );
+    }
+
+    async function getOrRequireCertificate() {
       const privName = `priv_${CURRENT_USER}`;
       const pubName = `pub_${CURRENT_USER}`;
 
@@ -126,35 +209,50 @@ block content
       const publicKey = await getKey(pubName);
 
       if (privateKey && publicKey) {
-        console.log('Claves cargadas de IndexedDB');
+        console.log('Claves cargadas desde IndexedDB');
         return { privateKey, publicKey };
       }
 
-      console.log('Generando nuevas claves...');
+      showCertModal();
+      throw new Error('Certificado requerido');
+    }
 
-      const keyPair = await crypto.subtle.generateKey(
-        {
-          name: 'RSA-OAEP',
-          modulusLength: 2048,
-          publicExponent: new Uint8Array([1, 0, 1]),
-          hash: 'SHA-256'
-        },
-        true,
-        ['encrypt', 'decrypt']
-      );
+    async function installCertificate() {
+      const file = certFile.files[0];
+      const passphrase = certPassphrase.value;
 
-      await saveKey(privName, keyPair.privateKey);
-      await saveKey(pubName, keyPair.publicKey);
+      if (!file || !passphrase) {
+        alert('Selecciona un certificado e introduce la passphrase.');
+        return;
+      }
 
-      const pubBase64 = await exportPublicKey(keyPair.publicKey);
+      try {
+        const certText = await file.text();
+        const cert = JSON.parse(certText);
 
-      await fetch('/auth3/public-key', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ publicKey: pubBase64 })
-      });
+        if (cert.username !== CURRENT_USER) {
+          alert('Este certificado no pertenece al usuario actual.');
+          return;
+        }
 
-      return keyPair;
+        const privateKey = await decryptPrivateKeyFromCertificate(cert, passphrase);
+        const publicKey = await importPublicKey(cert.publicKey);
+
+        await saveKey(`priv_${CURRENT_USER}`, privateKey);
+        await saveKey(`pub_${CURRENT_USER}`, publicKey);
+
+        await fetch('/auth3/public-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ publicKey: cert.publicKey })
+        });
+
+        hideCertModal();
+        location.reload();
+      } catch (error) {
+        console.error(error);
+        alert('No se pudo importar el certificado. Revisa el archivo y la passphrase.');
+      }
     }
 
     async function getRecipientPublicKey(username) {
@@ -181,8 +279,17 @@ block content
 
       const rawKey = await crypto.subtle.exportKey('raw', aesKey);
 
-      const encRec = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, recipientPub, rawKey);
-      const encSend = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, senderPub, rawKey);
+      const encRec = await crypto.subtle.encrypt(
+        { name: 'RSA-OAEP' },
+        recipientPub,
+        rawKey
+      );
+
+      const encSend = await crypto.subtle.encrypt(
+        { name: 'RSA-OAEP' },
+        senderPub,
+        rawKey
+      );
 
       return {
         ciphertext: abToBase64(ciphertext),
@@ -212,7 +319,10 @@ block content
       );
 
       const text = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv: new Uint8Array(base64ToAb(msg.iv)) },
+        {
+          name: 'AES-GCM',
+          iv: new Uint8Array(base64ToAb(msg.iv))
+        },
         aesKey,
         base64ToAb(msg.ciphertext)
       );
@@ -234,6 +344,7 @@ block content
 
       messagesContainer.innerHTML = messages.map(m => {
         const mine = m.from === CURRENT_USER;
+
         return `
           <div class="message-row ${mine ? 'mine' : 'theirs'}">
             <div class="message-bubble ${mine ? 'mine-bubble' : 'theirs-bubble'}">
@@ -249,7 +360,7 @@ block content
     }
 
     async function init() {
-      const keys = await getOrCreateKeyPair();
+      const keys = await getOrRequireCertificate();
       const recipientPub = await getRecipientPublicKey(OTHER_USER);
 
       const decrypted = [];
@@ -315,7 +426,8 @@ block content
       updateCounter();
     }
 
+    installCertButton.addEventListener('click', installCertificate);
+
     init().catch(err => {
       console.error('Error inicializando E2EE:', err);
-      messagesContainer.innerHTML = '<div class="empty-chat"><p>Error inicializando el cifrado.</p></div>';
     });

@@ -93,12 +93,15 @@ router.get('/register', (req, res) => {
 
 // Procesar registro
 router.post('/register', async (req, res) => {
-    const User3 = getUser3Model();
+  const User3 = getUser3Model();
+
   try {
     const username = req.body.username?.trim().toLowerCase();
     const email = req.body.email?.trim().toLowerCase();
     const password = req.body.password?.trim();
+    const publicKey = req.body.publicKey;
 
+    // Validaciones básicas
     if (!username || !email || !password) {
       req.session.error = 'Debes rellenar todos los campos';
       return res.redirect('/auth3/register');
@@ -109,6 +112,13 @@ router.post('/register', async (req, res) => {
       return res.redirect('/auth3/register');
     }
 
+    // validar que venga la clave pública
+    if (!publicKey) {
+      req.session.error = 'Error generando el certificado. Inténtalo de nuevo.';
+      return res.redirect('/auth3/register');
+    }
+
+    // Usuario duplicado
     const existingUser = await User3.findOne({ username });
 
     if (existingUser) {
@@ -116,18 +126,22 @@ router.post('/register', async (req, res) => {
       return res.redirect('/auth3/register');
     }
 
+    // Hash contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
+    // GUARDAR CLAVE PÚBLICA
     const newUser = new User3({
       username,
       email,
-      password: hashedPassword
+      password: hashedPassword,
+      publicKey 
     });
 
     await newUser.save();
 
-    req.session.error = 'Registro completado. Ya puedes iniciar sesión.';
+    req.session.error = 'Registro completado. Guarda tu certificado. Ya puedes iniciar sesión.';
     res.redirect('/auth3/login');
+
   } catch (error) {
     console.error(error);
     req.session.error = 'Error al registrar el usuario';
