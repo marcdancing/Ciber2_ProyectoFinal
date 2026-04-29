@@ -22,6 +22,16 @@ const user3Schema = new mongoose.Schema({
   publicKey: {
     type: String,
     default: null
+  },
+
+  mfaSecret: {
+    type: String,
+    default:null
+  },
+
+  mfaEnabled: {
+    type: Boolean,
+    default: false
   }
 }, {
   collection: 'usuarios3'

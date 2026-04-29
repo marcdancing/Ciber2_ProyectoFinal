@@ -33,6 +33,32 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  const forwardedHost = req.headers['x-forwarded-host'] || '';
+  const realHost = forwardedHost || host;
+
+  console.log('HOST:', realHost, 'PATH:', req.path);
+
+  if (realHost.includes('trycloudflare.com')) {
+    const allowedPrefixes = [
+      '/auth3',
+      '/message3',
+      '/stylesheets',
+      '/javascripts',
+      '/images'
+    ];
+
+    const allowed = allowedPrefixes.some(prefix => req.path.startsWith(prefix));
+
+    if (!allowed) {
+      return res.redirect('/auth3/login');
+    }
+  }
+
+  next();
+});
+
 app.use(session({
   secret: 'secreto-app2',
   resave: false,
@@ -40,6 +66,8 @@ app.use(session({
 }));
 
 // Rutas
+
+
 app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
@@ -48,6 +76,30 @@ app.use('/message2', rutaMensaje2);
 app.use('/auth2', auth2Router);
 app.use('/auth3', require('./routes/auth3'));
 app.use('/message3', require('./routes/mensajes3'));
+
+// app.use((req, res, next) => {
+//   const host = req.headers.host;
+
+//   // Solo aplicar restricción si viene de cloudflare
+//   if (host.includes('trycloudflare.com')) {
+
+//     const allowedPrefixes = [
+//       '/auth3',
+//       '/message3',
+//       '/stylesheets',
+//       '/javascripts',
+//       '/images'
+//     ];
+
+//     const allowed = allowedPrefixes.some(prefix => req.path.startsWith(prefix));
+
+//     if (!allowed) {
+//       return res.redirect('/auth3/login');
+//     }
+//   }
+
+//   next();
+// });
 
 // APP 3 endurecimiento
 

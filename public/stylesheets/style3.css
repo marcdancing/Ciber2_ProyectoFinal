@@ -1,20 +1,17 @@
 :root {
-  --gov-navy: #071527;
-  --gov-navy-2: #0b1f38;
-  --gov-blue: #123c69;
-  --gov-blue-soft: #1d4f85;
-  --gov-gold: #c9a227;
-  --gov-gold-soft: #e2c76f;
-  --gov-bg: #eef2f6;
-  --gov-panel: #ffffff;
-  --gov-text: #102033;
-  --gov-muted: #64748b;
-  --gov-border: #d8e0ea;
-  --gov-danger: #a62626;
-  --gov-danger-bg: #fde8e8;
-  --gov-success: #0f766e;
-  --radius: 14px;
-  --shadow: 0 18px 45px rgba(7, 21, 39, 0.16);
+  --bg: #0b1020;
+  --panel: #ffffff;
+  --panel-soft: #f8fafc;
+  --primary: #1e3a8a;
+  --primary-2: #2563eb;
+  --accent: #d4af37;
+  --text: #111827;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --danger: #dc2626;
+  --danger-bg: #fee2e2;
+  --shadow: 0 24px 70px rgba(2, 6, 23, 0.25);
+  --radius: 22px;
 }
 
 * {
@@ -23,12 +20,12 @@
 
 body {
   margin: 0;
-  font-family: "Segoe UI", Arial, sans-serif;
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
   background:
-    linear-gradient(135deg, rgba(7, 21, 39, 0.96), rgba(18, 60, 105, 0.88)),
-    radial-gradient(circle at top right, rgba(201, 162, 39, 0.22), transparent 35%),
-    var(--gov-bg);
-  color: var(--gov-text);
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.35), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(212, 175, 55, 0.18), transparent 28%),
+    linear-gradient(135deg, #020617 0%, #0f172a 48%, #172554 100%);
+  color: var(--text);
 }
 
 a {
@@ -37,85 +34,97 @@ a {
 
 .chat-page {
   min-height: 100vh;
-  padding: 32px 18px;
+  padding: 34px 18px;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
 }
 
 .chat-container {
   width: 100%;
-  max-width: 1080px;
+  max-width: 1100px;
   height: 88vh;
-  background: var(--gov-panel);
-  border-radius: var(--radius);
-  overflow: hidden;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: var(--radius);
   box-shadow: var(--shadow);
   border: 1px solid rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(18px);
 }
 
 .chat-container.small {
   max-width: 620px;
   height: auto;
-  min-height: 520px;
+  min-height: 540px;
 }
 
 .chat-header {
-  background: linear-gradient(90deg, var(--gov-navy), var(--gov-blue));
+  background: linear-gradient(135deg, #0f172a, #1e3a8a 62%, #2563eb);
   color: white;
-  padding: 22px 28px;
+  padding: 24px 28px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
-  border-bottom: 4px solid var(--gov-gold);
+  position: relative;
+}
+
+.chat-header::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), transparent);
 }
 
 .chat-title {
   margin: 0;
   font-size: 1.75rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-weight: 850;
+  letter-spacing: -0.035em;
 }
 
 .chat-title::before {
-  content: "▣ ";
-  color: var(--gov-gold-soft);
+  content: "SecureGov · ";
+  color: #facc15;
+  font-weight: 800;
 }
 
 .chat-actions {
   display: flex;
-  align-items: center;
   gap: 10px;
+  align-items: center;
   flex-wrap: wrap;
 }
 
 .session-user {
-  background: rgba(255, 255, 255, 0.1);
-  color: #eef6ff;
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  padding: 9px 13px;
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+  padding: 10px 14px;
   border-radius: 999px;
   font-size: 0.92rem;
   font-weight: 700;
+  border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
 .chat-link {
   color: white;
-  background: rgba(255, 255, 255, 0.11);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 10px 15px;
   border-radius: 999px;
-  font-weight: 700;
+  font-weight: 750;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   transition: 0.2s ease;
 }
 
 .chat-link:hover {
-  background: var(--gov-gold);
-  color: var(--gov-navy);
+  background: white;
+  color: var(--primary);
   transform: translateY(-1px);
 }
 
@@ -124,48 +133,42 @@ a {
   padding: 28px;
   overflow-y: auto;
   background:
-    linear-gradient(180deg, #f8fafc, #edf2f7),
-    var(--gov-bg);
+    linear-gradient(180deg, #f8fafc, #eef4ff);
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
 .chat-body::before {
-  content: "Canal seguro institucional · Comunicaciones protegidas";
-  display: block;
+  content: "Canal cifrado extremo a extremo · Certificado de usuario requerido";
   width: fit-content;
-  background: #e8eef6;
-  color: var(--gov-blue);
-  border: 1px solid var(--gov-border);
-  border-left: 4px solid var(--gov-gold);
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
   padding: 10px 14px;
-  border-radius: 10px;
-  font-size: 0.86rem;
-  font-weight: 700;
-  margin-bottom: 4px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
 }
 
 .empty-chat {
   margin: auto;
-  max-width: 520px;
   background: white;
-  color: var(--gov-muted);
+  color: var(--muted);
   padding: 24px 28px;
-  border-radius: var(--radius);
-  border: 1px solid var(--gov-border);
-  box-shadow: 0 8px 28px rgba(7, 21, 39, 0.08);
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
   text-align: center;
 }
 
 .error-box {
-  background: var(--gov-danger-bg);
-  color: var(--gov-danger);
-  border: 1px solid #f1b8b8;
-  border-left: 5px solid var(--gov-danger);
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid #fecaca;
   padding: 13px 15px;
-  border-radius: 10px;
-  font-weight: 700;
+  border-radius: 14px;
+  font-weight: 800;
 }
 
 .chat-form {
@@ -177,88 +180,89 @@ a {
 .chat-input,
 .chat-send-input {
   width: 100%;
-  border: 1px solid var(--gov-border);
-  background: #ffffff;
-  color: var(--gov-text);
-  border-radius: 10px;
-  padding: 14px 15px;
+  border: 1px solid var(--border);
+  background: white;
+  color: var(--text);
+  border-radius: 15px;
+  padding: 15px 16px;
   font-size: 1rem;
   outline: none;
-  transition: 0.2s ease;
+  transition: 0.18s ease;
 }
 
 .chat-input:focus,
 .chat-send-input:focus {
-  border-color: var(--gov-blue-soft);
-  box-shadow: 0 0 0 4px rgba(29, 79, 133, 0.12);
+  border-color: var(--primary-2);
+  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
 }
 
 .chat-button,
 .chat-send-button {
   border: none;
-  background: linear-gradient(135deg, var(--gov-blue), var(--gov-navy));
+  background: linear-gradient(135deg, var(--primary-2), var(--primary));
   color: white;
-  padding: 14px 18px;
-  border-radius: 10px;
-  font-weight: 800;
+  padding: 15px 20px;
+  border-radius: 15px;
+  font-weight: 850;
   cursor: pointer;
   transition: 0.2s ease;
-  box-shadow: 0 10px 20px rgba(7, 21, 39, 0.18);
+  box-shadow: 0 14px 28px rgba(37, 99, 235, 0.24);
 }
 
 .chat-button:hover,
 .chat-send-button:hover {
-  background: linear-gradient(135deg, var(--gov-gold), #b58f18);
-  color: var(--gov-navy);
   transform: translateY(-1px);
+  filter: brightness(1.04);
 }
 
 .chat-send-button:disabled {
   background: #94a3b8;
-  color: #e5e7eb;
   cursor: not-allowed;
-  transform: none;
   box-shadow: none;
+  transform: none;
 }
 
 .contacts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
 }
 
 .contact-card {
   display: block;
   background: white;
-  color: var(--gov-text);
-  border: 1px solid var(--gov-border);
-  border-left: 5px solid var(--gov-blue);
-  padding: 18px 20px;
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(7, 21, 39, 0.07);
+  color: var(--text);
+  padding: 20px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.08);
   transition: 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.contact-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: linear-gradient(180deg, var(--primary-2), var(--accent));
 }
 
 .contact-card:hover {
-  border-left-color: var(--gov-gold);
-  transform: translateY(-2px);
-  box-shadow: 0 14px 32px rgba(7, 21, 39, 0.12);
+  transform: translateY(-3px);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.14);
 }
 
 .contact-name {
-  font-size: 1.08rem;
-  font-weight: 800;
-  color: var(--gov-navy);
-}
-
-.contact-name::before {
-  content: "ID · ";
-  color: var(--gov-gold);
+  font-weight: 850;
+  font-size: 1.1rem;
+  color: #0f172a;
 }
 
 .contact-email {
   margin-top: 6px;
-  color: var(--gov-muted);
+  color: var(--muted);
   font-size: 0.94rem;
 }
 
@@ -284,22 +288,21 @@ a {
 .message-bubble {
   max-width: 68%;
   padding: 14px 16px;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(7, 21, 39, 0.1);
-  border: 1px solid rgba(7, 21, 39, 0.08);
+  border-radius: 19px;
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.11);
 }
 
 .mine-bubble {
-  background: linear-gradient(135deg, var(--gov-blue), var(--gov-navy-2));
+  background: linear-gradient(135deg, #2563eb, #1e40af);
   color: white;
-  border-bottom-right-radius: 4px;
+  border-bottom-right-radius: 6px;
 }
 
 .theirs-bubble {
-  background: #ffffff;
-  color: var(--gov-text);
-  border-bottom-left-radius: 4px;
-  border-left: 4px solid var(--gov-gold);
+  background: white;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
 }
 
 .message-meta {
@@ -311,14 +314,13 @@ a {
 }
 
 .message-user {
-  font-weight: 900;
-  font-size: 0.95rem;
+  font-weight: 850;
+  font-size: 0.92rem;
 }
 
 .message-time {
   font-size: 0.78rem;
-  color: inherit;
-  opacity: 0.75;
+  opacity: 0.72;
 }
 
 .message-text {
@@ -329,8 +331,8 @@ a {
 
 .chat-footer {
   padding: 18px 24px;
-  background: #ffffff;
-  border-top: 1px solid var(--gov-border);
+  background: white;
+  border-top: 1px solid var(--border);
 }
 
 .chat-send-form {
@@ -348,32 +350,32 @@ a {
 
 .char-counter {
   align-self: flex-end;
-  color: var(--gov-muted);
+  color: var(--muted);
   font-size: 0.84rem;
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .char-counter.warning {
-  color: #b7791f;
+  color: #b45309;
 }
 
 .char-counter.danger {
-  color: var(--gov-danger);
+  color: var(--danger);
 }
 
 .input-warning {
-  border-color: #d69e2e !important;
-  box-shadow: 0 0 0 4px rgba(214, 158, 46, 0.14);
+  border-color: #f59e0b !important;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.14);
 }
 
 .input-danger {
-  border-color: var(--gov-danger) !important;
-  box-shadow: 0 0 0 4px rgba(166, 38, 38, 0.14);
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.14);
 }
 
 .limit-warning {
   display: none;
-  color: var(--gov-danger);
+  color: var(--danger);
   font-size: 0.86rem;
   font-weight: 800;
 }
@@ -390,8 +392,8 @@ a {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: rgba(7, 21, 39, 0.78);
-  backdrop-filter: blur(6px);
+  background: rgba(2, 6, 23, 0.72);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -401,45 +403,37 @@ a {
 .cert-modal-content {
   width: 100%;
   max-width: 620px;
-  background: #ffffff;
-  color: var(--gov-text);
-  border-radius: 16px;
+  background: white;
+  color: var(--text);
+  border-radius: 24px;
   padding: 30px;
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.35);
-  border-top: 6px solid var(--gov-gold);
+  box-shadow: 0 32px 90px rgba(0, 0, 0, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .cert-modal-content h2 {
   margin-top: 0;
-  color: var(--gov-navy);
-  font-size: 1.6rem;
+  color: #0f172a;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
 }
 
 .cert-modal-content h2::before {
-  content: "⚿ ";
-  color: var(--gov-gold);
+  content: "🔐 ";
 }
 
-.cert-modal-content p {
-  line-height: 1.5;
-  color: #334155;
-}
-
-.cert-modal-content ol {
-  padding-left: 20px;
-  color: #334155;
-}
-
+.cert-modal-content p,
 .cert-modal-content li {
-  margin-bottom: 7px;
+  color: #334155;
+  line-height: 1.5;
 }
 
 .cert-modal-content input {
   width: 100%;
   margin-top: 12px;
-  border: 1px solid var(--gov-border);
-  padding: 13px 14px;
-  border-radius: 10px;
+  border: 1px solid var(--border);
+  padding: 14px 15px;
+  border-radius: 14px;
   font-size: 1rem;
 }
 
@@ -447,26 +441,26 @@ a {
   background: #fff7ed;
   border: 1px solid #fed7aa;
   color: #9a3412 !important;
-  padding: 12px 14px;
-  border-radius: 10px;
+  padding: 13px 15px;
+  border-radius: 14px;
   font-weight: 800;
 }
 
-.auth-footer {
-  color: var(--gov-muted);
-}
-
 @media (max-width: 800px) {
+  .chat-page {
+    padding: 14px;
+  }
+
   .chat-container {
     height: 94vh;
+    border-radius: 18px;
   }
 
-  .chat-header {
-    padding: 18px;
-  }
-
-  .chat-body {
-    padding: 18px;
+  .chat-header,
+  .chat-body,
+  .chat-footer {
+    padding-left: 18px;
+    padding-right: 18px;
   }
 
   .chat-title {

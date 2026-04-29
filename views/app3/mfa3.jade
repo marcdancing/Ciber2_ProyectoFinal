@@ -1,0 +1,17 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+
+      .chat-body
+        if error
+          .error-box= error
+
+        p Introduce el código de Google Authenticator para #{username}.
+
+        form.chat-form(action='/auth3/mfa' method='POST')
+          input.chat-input(type='text' name='token' placeholder='Código MFA' required maxlength='6')
+          button.chat-button(type='submit') Verificar

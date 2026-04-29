@@ -1,0 +1,18 @@
+extends ../layout
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+
+      .chat-body
+        .empty-chat
+          h2 Configuración de Google Authenticator
+          p Escanea este código QR con Google Authenticator o una app compatible.
+          p Usuario: #{username}
+
+          img(src=qrCodeDataUrl alt='QR MFA' style='max-width:260px;width:100%;margin:20px auto;display:block;')
+
+          p Después de escanearlo, inicia sesión normalmente.
+          a.chat-link.secondary(href='/auth3/login') Ir al login

@@ -1,6 +1,9 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
+const speakeasy = require('speakeasy');
+const QRCode = require('qrcode');
+
 const router = express.Router();
 const getUser3Model = require('../models/User3');
 
@@ -22,7 +25,6 @@ const loginLimiter = rateLimit({
 
 // Mostrar login
 router.get('/login', (req, res) => {
-  const User3 = getUser3Model();
   const error = req.session.error || null;
   req.session.error = null;
 
@@ -32,10 +34,11 @@ router.get('/login', (req, res) => {
   });
 });
 
-// Procesar login
+// Procesar login: usuario + contraseña
 router.post('/login', loginLimiter, async (req, res) => {
-    const User3 = getUser3Model();
   try {
+    const User3 = getUser3Model();
+
     const username = req.body.username?.trim().toLowerCase();
     const password = req.body.password?.trim();
 
@@ -58,6 +61,70 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.redirect('/auth3/login');
     }
 
+    req.session.pendingMfaUser = {
+      id: user._id,
+      username: user.username
+    };
+
+    res.redirect('/auth3/mfa');
+  } catch (error) {
+    console.error(error);
+    req.session.error = 'Error interno al iniciar sesión';
+    res.redirect('/auth3/login');
+  }
+});
+
+// Mostrar MFA
+router.get('/mfa', (req, res) => {
+  if (!req.session.pendingMfaUser) {
+    return res.redirect('/auth3/login');
+  }
+
+  const error = req.session.error || null;
+  req.session.error = null;
+
+  res.render('app3/mfa3', {
+    title: 'Verificación MFA',
+    username: req.session.pendingMfaUser.username,
+    error
+  });
+});
+
+// Procesar MFA
+router.post('/mfa', async (req, res) => {
+  try {
+    const User3 = getUser3Model();
+
+    if (!req.session.pendingMfaUser) {
+      return res.redirect('/auth3/login');
+    }
+
+    const token = req.body.token?.trim();
+
+    if (!token) {
+      req.session.error = 'Introduce el código MFA';
+      return res.redirect('/auth3/mfa');
+    }
+
+    const user = await User3.findById(req.session.pendingMfaUser.id);
+
+    if (!user || !user.mfaSecret) {
+      req.session.error = 'MFA no configurado';
+      return res.redirect('/auth3/login');
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token,
+      window: 1
+    });
+
+    if (!verified) {
+      req.session.error = 'Código MFA incorrecto';
+      return res.redirect('/auth3/mfa');
+    }
+
     req.session.regenerate((err) => {
       if (err) {
         console.error(err);
@@ -70,18 +137,19 @@ router.post('/login', loginLimiter, async (req, res) => {
         username: user.username
       };
 
+      req.session.pendingMfaUser = null;
+
       res.redirect('/message3/inbox');
     });
   } catch (error) {
     console.error(error);
-    req.session.error = 'Error interno al iniciar sesión';
-    res.redirect('/auth3/login');
+    req.session.error = 'Error verificando MFA';
+    res.redirect('/auth3/mfa');
   }
 });
 
 // Mostrar registro
 router.get('/register', (req, res) => {
-  const User3 = getUser3Model();
   const error = req.session.error || null;
   req.session.error = null;
 
@@ -93,15 +161,14 @@ router.get('/register', (req, res) => {
 
 // Procesar registro
 router.post('/register', async (req, res) => {
-  const User3 = getUser3Model();
-
   try {
+    const User3 = getUser3Model();
+
     const username = req.body.username?.trim().toLowerCase();
     const email = req.body.email?.trim().toLowerCase();
     const password = req.body.password?.trim();
     const publicKey = req.body.publicKey;
 
-    // Validaciones básicas
     if (!username || !email || !password) {
       req.session.error = 'Debes rellenar todos los campos';
       return res.redirect('/auth3/register');
@@ -112,13 +179,11 @@ router.post('/register', async (req, res) => {
       return res.redirect('/auth3/register');
     }
 
-    // validar que venga la clave pública
     if (!publicKey) {
       req.session.error = 'Error generando el certificado. Inténtalo de nuevo.';
       return res.redirect('/auth3/register');
     }
 
-    // Usuario duplicado
     const existingUser = await User3.findOne({ username });
 
     if (existingUser) {
@@ -126,22 +191,31 @@ router.post('/register', async (req, res) => {
       return res.redirect('/auth3/register');
     }
 
-    // Hash contraseña
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    // GUARDAR CLAVE PÚBLICA
+    const mfaSecret = speakeasy.generateSecret({
+      name: `SecureGov (${username})`
+    });
+
+    const qrCodeDataUrl = await QRCode.toDataURL(mfaSecret.otpauth_url);
+
     const newUser = new User3({
       username,
       email,
       password: hashedPassword,
-      publicKey 
+      publicKey,
+      mfaSecret: mfaSecret.base32,
+      mfaEnabled: true
     });
 
     await newUser.save();
 
-    req.session.error = 'Registro completado. Guarda tu certificado. Ya puedes iniciar sesión.';
-    res.redirect('/auth3/login');
+    req.session.mfaSetup = {
+      username,
+      qrCodeDataUrl
+    };
 
+    res.redirect('/auth3/setup-mfa');
   } catch (error) {
     console.error(error);
     req.session.error = 'Error al registrar el usuario';
@@ -149,6 +223,20 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Mostrar QR MFA tras registro
+router.get('/setup-mfa', (req, res) => {
+  if (!req.session.mfaSetup) {
+    return res.redirect('/auth3/login');
+  }
+
+  res.render('app3/setupMfa3', {
+    title: 'Configurar MFA',
+    username: req.session.mfaSetup.username,
+    qrCodeDataUrl: req.session.mfaSetup.qrCodeDataUrl
+  });
+});
+
+// Guardar clave pública
 router.post('/public-key', requireAuth3, async (req, res) => {
   try {
     const User3 = getUser3Model();
@@ -170,6 +258,7 @@ router.post('/public-key', requireAuth3, async (req, res) => {
   }
 });
 
+// Obtener clave pública de otro usuario
 router.get('/public-key/:username', requireAuth3, async (req, res) => {
   try {
     const User3 = getUser3Model();
