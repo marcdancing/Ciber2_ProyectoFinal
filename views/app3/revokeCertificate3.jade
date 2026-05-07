@@ -1,0 +1,362 @@
+extends ../layout3
+
+block content
+  .chat-page
+    .chat-container.small
+      .chat-header
+        h1.chat-title= title
+        a.chat-link(href='/message3/inbox') Volver
+
+      .chat-body
+        if error
+          .error-box= error
+
+        .danger-panel
+          h2 Revocación de certificado criptográfico
+
+          p Estás a punto de revocar el certificado actual del usuario:
+          p
+            strong #{username}
+
+          p Esta acción debe realizarse únicamente si crees que alguien puede tener acceso a tu certificado privado o a su passphrase.
+
+          .cert-warning
+            p
+              strong Consecuencias importantes:
+            ul
+              li El certificado actual dejará de ser válido para nuevos mensajes.
+              li Se generará un nuevo certificado criptográfico.
+              li Los mensajes antiguos cifrados con el certificado anterior pueden dejar de ser accesibles.
+              li Si alguien ya tenía el certificado antiguo y acceso a mensajes antiguos, podría haber accedido al histórico anterior.
+              li A partir de la revocación, los nuevos mensajes usarán la nueva clave pública.
+
+          if !query || query.approved !== '1'
+            form.chat-form(action='/auth3/revoke-certificate/verify-mfa' method='POST')
+              label.confirm-row
+                input(type='checkbox' name='confirmation')
+                span Entiendo que esta acción puede provocar la pérdida de acceso a mensajes antiguos.
+
+              input.chat-input(
+                type='text'
+                name='token'
+                placeholder='Código MFA'
+                maxlength='6'
+                required
+              )
+
+              button.chat-button.danger-button(type='submit') Verificar MFA y continuar
+
+          else
+            .cert-modal-content.inline-cert-box
+              h2 Generar nuevo certificado
+
+              p Introduce una nueva passphrase robusta para proteger el nuevo certificado.
+              p.cert-warning Guarda el nuevo archivo descargado. Será necesario para acceder a tus mensajes futuros.
+
+              input#newCertPassphrase.chat-input(
+                type='password'
+                placeholder='Nueva passphrase del certificado'
+              )
+
+              .policy-message#passphraseMessage.hidden
+                | La passphrase todavía no cumple la política de seguridad.
+
+              .password-policy#passphrasePolicy
+                p Política de passphrase:
+                ul
+                  li#passRuleLength Mínimo 12 caracteres
+                  li#passRuleUpper Al menos una mayúscula
+                  li#passRuleLower Al menos una minúscula
+                  li#passRuleNumber Al menos un número
+                  li#passRuleSymbol Al menos un carácter especial
+
+              button#generateNewCertButton.chat-button.danger-button(type='button' disabled) Revocar y generar nuevo certificado
+
+  script.
+    const CURRENT_USER = !{JSON.stringify(username)};
+
+    const passInput = document.getElementById('newCertPassphrase');
+    const generateButton = document.getElementById('generateNewCertButton');
+    const passphraseMessage = document.getElementById('passphraseMessage');
+
+    const passRuleLength = document.getElementById('passRuleLength');
+    const passRuleUpper = document.getElementById('passRuleUpper');
+    const passRuleLower = document.getElementById('passRuleLower');
+    const passRuleNumber = document.getElementById('passRuleNumber');
+    const passRuleSymbol = document.getElementById('passRuleSymbol');
+
+    function validatePassphrase(passphrase) {
+      return {
+        length: passphrase.length >= 12,
+        upper: /[A-Z]/.test(passphrase),
+        lower: /[a-z]/.test(passphrase),
+        number: /\d/.test(passphrase),
+        symbol: /[^A-Za-z\d]/.test(passphrase)
+      };
+    }
+
+    function isPassphraseValid(passphrase) {
+      const rules = validatePassphrase(passphrase);
+      return rules.length && rules.upper && rules.lower && rules.number && rules.symbol;
+    }
+
+    function setRuleState(element, valid) {
+      if (!element) return;
+
+      element.classList.remove('rule-ok', 'rule-bad');
+
+      if (valid) {
+        element.classList.add('rule-ok');
+      } else {
+        element.classList.add('rule-bad');
+      }
+    }
+
+    function showPolicyMessage(element) {
+      if (element) {
+        element.classList.remove('hidden');
+      }
+    }
+
+    function hidePolicyMessage(element) {
+      if (element) {
+        element.classList.add('hidden');
+      }
+    }
+
+    function updatePassphraseState() {
+      if (!passInput || !generateButton) return;
+
+      const value = passInput.value;
+      const rules = validatePassphrase(value);
+      const valid = isPassphraseValid(value);
+
+      setRuleState(passRuleLength, rules.length);
+      setRuleState(passRuleUpper, rules.upper);
+      setRuleState(passRuleLower, rules.lower);
+      setRuleState(passRuleNumber, rules.number);
+      setRuleState(passRuleSymbol, rules.symbol);
+
+      passInput.classList.remove('input-danger');
+
+      if (value.length === 0) {
+        hidePolicyMessage(passphraseMessage);
+      } else if (!valid) {
+        passInput.classList.add('input-danger');
+        showPolicyMessage(passphraseMessage);
+      } else {
+        hidePolicyMessage(passphraseMessage);
+      }
+
+      generateButton.disabled = !valid;
+    }
+
+    function strToArrayBuffer(str) {
+      return new TextEncoder().encode(str);
+    }
+
+    function abToBase64(buffer) {
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+
+      bytes.forEach(b => {
+        binary += String.fromCharCode(b);
+      });
+
+      return btoa(binary);
+    }
+
+    async function exportPublicKey(key) {
+      const spki = await crypto.subtle.exportKey('spki', key);
+      return abToBase64(spki);
+    }
+
+    async function exportPrivateKey(key) {
+      return crypto.subtle.exportKey('pkcs8', key);
+    }
+
+    async function deriveKey(passphrase, salt) {
+      const keyMaterial = await crypto.subtle.importKey(
+        'raw',
+        strToArrayBuffer(passphrase),
+        'PBKDF2',
+        false,
+        ['deriveKey']
+      );
+
+      return crypto.subtle.deriveKey(
+        {
+          name: 'PBKDF2',
+          salt,
+          iterations: 250000,
+          hash: 'SHA-256'
+        },
+        keyMaterial,
+        {
+          name: 'AES-GCM',
+          length: 256
+        },
+        false,
+        ['encrypt']
+      );
+    }
+
+    async function generateCertificate(username, passphrase) {
+      const keyPair = await crypto.subtle.generateKey(
+        {
+          name: 'RSA-OAEP',
+          modulusLength: 2048,
+          publicExponent: new Uint8Array([1, 0, 1]),
+          hash: 'SHA-256'
+        },
+        true,
+        ['encrypt', 'decrypt']
+      );
+
+      const publicKey = await exportPublicKey(keyPair.publicKey);
+      const privateKeyRaw = await exportPrivateKey(keyPair.privateKey);
+
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+
+      const aesKey = await deriveKey(passphrase, salt);
+
+      const encryptedPrivateKey = await crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv
+        },
+        aesKey,
+        privateKeyRaw
+      );
+
+      return {
+        username,
+        publicKey,
+        encryptedPrivateKey: abToBase64(encryptedPrivateKey),
+        salt: abToBase64(salt.buffer),
+        iv: abToBase64(iv.buffer),
+        algorithm: 'RSA-OAEP + AES-GCM + PBKDF2',
+        purpose: 'revoked-and-rotated-certificate',
+        createdAt: new Date().toISOString()
+      };
+    }
+
+    function downloadCertificate(cert, version) {
+      const blob = new Blob([JSON.stringify(cert, null, 2)], {
+        type: 'application/x-secmsg-certificate'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+
+      a.href = url;
+      a.download = `certificado-${cert.username}-app3-v${version}.secmsg`;
+      a.style.display = 'none';
+
+      document.body.appendChild(a);
+      a.click();
+
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
+    }
+
+    function openKeyDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open('App3KeyStore', 1);
+
+        request.onupgradeneeded = () => {
+          const db = request.result;
+
+          if (!db.objectStoreNames.contains('keys')) {
+            db.createObjectStore('keys');
+          }
+        };
+
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    async function deleteKey(name) {
+      const db = await openKeyDB();
+
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('keys', 'readwrite');
+        tx.objectStore('keys').delete(name);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function clearLocalOldKeys(username) {
+      await deleteKey(`priv_${username}`);
+      await deleteKey(`pub_${username}`);
+    }
+
+    async function completeRevocation() {
+      const passphrase = passInput.value.trim();
+
+      if (!isPassphraseValid(passphrase)) {
+        alert('La passphrase no cumple la política de seguridad.');
+        return;
+      }
+
+      const confirmed = confirm(
+        'Vas a revocar el certificado actual y generar uno nuevo. Los mensajes antiguos pueden dejar de ser accesibles. ¿Quieres continuar?'
+      );
+
+      if (!confirmed) {
+        return;
+      }
+
+      try {
+        generateButton.disabled = true;
+        generateButton.textContent = 'Generando certificado...';
+
+        const cert = await generateCertificate(CURRENT_USER, passphrase);
+
+        const response = await fetch('/auth3/revoke-certificate/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            publicKey: cert.publicKey
+          })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          alert(data.error || 'No se pudo completar la revocación.');
+          generateButton.disabled = false;
+          generateButton.textContent = 'Revocar y generar nuevo certificado';
+          return;
+        }
+
+        cert.certificateVersion = data.certificateVersion;
+
+        await clearLocalOldKeys(CURRENT_USER);
+
+        downloadCertificate(cert, data.certificateVersion);
+
+        alert('Certificado revocado correctamente. Se ha descargado el nuevo certificado. Deberás importarlo para usar este equipo.');
+
+        window.location.href = '/message3/inbox';
+      } catch (error) {
+        console.error(error);
+        alert('Error generando el nuevo certificado.');
+
+        generateButton.disabled = false;
+        generateButton.textContent = 'Revocar y generar nuevo certificado';
+      }
+    }
+
+    if (passInput && generateButton) {
+      passInput.addEventListener('input', updatePassphraseState);
+      generateButton.addEventListener('click', completeRevocation);
+      updatePassphraseState();
+    }

@@ -11,6 +11,7 @@ const rutaMensaje2 = require('./routes/mensajes2');
 const auth2Router = require('./routes/auth2');
 const auth3Router = require('./routes/auth3');
 const rutaMensaje3 = require('./routes/mensajes3');
+require('dotenv').config();
 
 const { connectDB2 } = require('./db2');connectDB2();
 

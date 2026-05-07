@@ -166,7 +166,7 @@ router.post('/register', async (req, res) => {
 
     const username = req.body.username?.trim().toLowerCase();
     const email = req.body.email?.trim().toLowerCase();
-    const password = req.body.password?.trim();
+    const password = req.body.password;
     const publicKey = req.body.publicKey;
 
     if (!username || !email || !password) {
@@ -174,8 +174,31 @@ router.post('/register', async (req, res) => {
       return res.redirect('/auth3/register');
     }
 
-    if (password.length < 8) {
-      req.session.error = 'La contraseña debe tener al menos 8 caracteres';
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z\d]).{10,}$/;
+
+    if (!passwordRegex.test(password)) {
+      req.session.error =
+        'La contraseña debe tener al menos 10 caracteres e incluir mayúsculas, minúsculas, números y caracteres especiales.';
+      return res.redirect('/auth3/register');
+    }
+
+    const commonPasswords = [
+      'password',
+      'password123',
+      '123456',
+      '123456789',
+      'qwerty',
+      'admin',
+      'admin123',
+      'hola123',
+      'securegov123',
+      'contraseña',
+      'contraseña123'
+    ];
+
+    if (commonPasswords.includes(password.toLowerCase())) {
+      req.session.error = 'La contraseña es demasiado común. Utiliza una contraseña más segura.';
       return res.redirect('/auth3/register');
     }
 
@@ -277,6 +300,144 @@ router.get('/public-key/:username', requireAuth3, async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Error obteniendo la clave pública' });
+  }
+});
+
+// Mostrar pantalla de revocación de certificado
+router.get('/revoke-certificate', requireAuth3, async (req, res) => {
+  try {
+    const error = req.session.error || null;
+    req.session.error = null;
+
+    res.render('app3/revokeCertificate3', {
+      title: 'Revocar certificado',
+      username: req.session.user3.username,
+      error,
+      query: req.query
+    });
+  } catch (error) {
+    console.error(error);
+    req.session.error = 'Error cargando la pantalla de revocación';
+    res.redirect('/message3/inbox');
+  }
+});
+
+// Verificar MFA antes de permitir revocar el certificado
+router.post('/revoke-certificate/verify-mfa', requireAuth3, async (req, res) => {
+  try {
+    const User3 = getUser3Model();
+
+    const token = req.body.token?.trim();
+    const confirmation = req.body.confirmation;
+
+    if (confirmation !== 'on') {
+      req.session.error = 'Debes confirmar que entiendes las consecuencias de la revocación.';
+      return res.redirect('/auth3/revoke-certificate');
+    }
+
+    if (!token) {
+      req.session.error = 'Introduce el código MFA para continuar.';
+      return res.redirect('/auth3/revoke-certificate');
+    }
+
+    const user = await User3.findById(req.session.user3.id);
+
+    if (!user || !user.mfaSecret) {
+      req.session.error = 'MFA no configurado.';
+      return res.redirect('/auth3/revoke-certificate');
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.mfaSecret,
+      encoding: 'base32',
+      token,
+      window: 1
+    });
+
+    if (!verified) {
+      req.session.error = 'Código MFA incorrecto.';
+      return res.redirect('/auth3/revoke-certificate');
+    }
+
+    req.session.certificateRevocationApproved = {
+      userId: String(user._id),
+      approvedAt: Date.now()
+    };
+
+    res.redirect('/auth3/revoke-certificate?approved=1');
+  } catch (error) {
+    console.error(error);
+    req.session.error = 'Error verificando MFA.';
+    res.redirect('/auth3/revoke-certificate');
+  }
+});
+
+// Completar revocación: guardar nueva clave pública
+router.post('/revoke-certificate/complete', requireAuth3, async (req, res) => {
+  try {
+    const User3 = getUser3Model();
+
+    const approval = req.session.certificateRevocationApproved;
+
+    if (!approval || approval.userId !== String(req.session.user3.id)) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Revocación no autorizada. Debes verificar MFA primero.'
+      });
+    }
+
+    const approvalExpired =
+      Date.now() - approval.approvedAt > 5 * 60 * 1000;
+
+    if (approvalExpired) {
+      req.session.certificateRevocationApproved = null;
+
+      return res.status(403).json({
+        ok: false,
+        error: 'La autorización MFA ha expirado. Vuelve a intentarlo.'
+      });
+    }
+
+    const publicKey = req.body.publicKey;
+
+    if (!publicKey) {
+      return res.status(400).json({
+        ok: false,
+        error: 'Falta la nueva clave pública.'
+      });
+    }
+
+    const user = await User3.findById(req.session.user3.id);
+
+    if (!user) {
+      return res.status(404).json({
+        ok: false,
+        error: 'Usuario no encontrado.'
+      });
+    }
+
+    user.publicKey = publicKey;
+    user.certificateVersion = (user.certificateVersion || 1) + 1;
+    user.certificateRevokedAt = new Date();
+    user.certificateUpdatedAt = new Date();
+
+    await user.save();
+
+    req.session.certificateRevocationApproved = null;
+    req.session.captchaSolvedAt = null;
+    req.session.messageTimestamps = [];
+
+    res.json({
+      ok: true,
+      certificateVersion: user.certificateVersion
+    });
+  } catch (error) {
+    console.error('ERROR completando revocación de certificado:', error);
+
+    res.status(500).json({
+      ok: false,
+      error: 'Error completando la revocación del certificado.'
+    });
   }
 });
 

@@ -19,15 +19,27 @@ block content
             h2 Certificado de usuario requerido
             p Para acceder a tus mensajes cifrados necesitas importar tu certificado personal.
             p Este certificado contiene tu clave privada cifrada. Sin él no podrás descifrar mensajes antiguos ni operar desde este equipo.
+            p.cert-warning Si has revocado tu certificado, debes importar el certificado nuevo. El certificado anterior ya no será aceptado.
             ol
               li Selecciona tu archivo de certificado.
               li Introduce la passphrase usada al generarlo.
               li Pulsa “Importar certificado”.
               li Una vez importado, este equipo quedará autorizado.
             p.cert-warning Importante: si pierdes el certificado o la passphrase, no podrás recuperar tus mensajes cifrados.
-            input#certFile(type='file' accept='.json')
+            input#certFile(type='file' accept='.secmsg,.json')
             input#certPassphrase(type='password' placeholder='Passphrase del certificado')
             button#installCertButton.chat-button(type='button') Importar certificado
+
+        #captchaModal.cert-modal.hidden
+          .cert-modal-content
+            h2 Verificación humana requerida
+            p Se han detectado muchos mensajes enviados en poco tiempo.
+            p Para continuar, introduce el código que aparece en la imagen.
+
+            #captchaImage.captcha-image
+
+            input#captchaAnswer.chat-input(type='text' placeholder='Código de verificación' autocomplete='off')
+            button#captchaButton.chat-button(type='button') Verificar
 
         #messagesContainer
           if !mensajes || mensajes.length === 0
@@ -48,6 +60,7 @@ block content
     const CURRENT_USER = !{JSON.stringify(username)};
     const OTHER_USER = !{JSON.stringify(otroUsuario)};
     const RAW_MESSAGES = !{JSON.stringify(mensajes || [])};
+    const ACTIVE_CERTIFICATE_VERSION = !{JSON.stringify(certificateVersion || 1)};
 
     const messageInput = document.getElementById('messageInput');
     const charCount = document.getElementById('charCount');
@@ -62,7 +75,16 @@ block content
     const certPassphrase = document.getElementById('certPassphrase');
     const installCertButton = document.getElementById('installCertButton');
 
+    const captchaModal = document.getElementById('captchaModal');
+    const captchaImage = document.getElementById('captchaImage');
+    const captchaAnswer = document.getElementById('captchaAnswer');
+    const captchaButton = document.getElementById('captchaButton');
+
     const LIMIT = 200;
+
+    let cachedKeys = null;
+    let cachedRecipientPub = null;
+    let pendingMessageText = null;
 
     function showCertModal() {
       certModal.classList.remove('hidden');
@@ -72,12 +94,70 @@ block content
       certModal.classList.add('hidden');
     }
 
+    function showCaptchaModal() {
+      captchaModal.classList.remove('hidden');
+    }
+
+    function hideCaptchaModal() {
+      captchaModal.classList.add('hidden');
+    }
+
+    async function loadCaptcha() {
+      const response = await fetch('/message3/captcha');
+
+      if (!response.ok) {
+        alert('No se pudo cargar el CAPTCHA.');
+        return;
+      }
+
+      const data = await response.json();
+
+      captchaImage.innerHTML = data.svg || '';
+      captchaAnswer.value = '';
+
+      showCaptchaModal();
+      captchaAnswer.focus();
+    }
+
+    async function verifyCaptcha() {
+      const answer = captchaAnswer.value.trim();
+
+      if (!answer) {
+        alert('Introduce el código del CAPTCHA.');
+        return;
+      }
+
+      const response = await fetch('/message3/captcha', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ answer })
+      });
+
+      if (!response.ok) {
+        alert('CAPTCHA incorrecto o expirado. Se generará uno nuevo.');
+        await loadCaptcha();
+        return;
+      }
+
+      hideCaptchaModal();
+      alert('Verificación completada.');
+
+      if (pendingMessageText) {
+        const textToSend = pendingMessageText;
+        pendingMessageText = null;
+        await sendEncryptedMessage(textToSend);
+      }
+    }
+
     function openKeyDB() {
       return new Promise((resolve, reject) => {
         const request = indexedDB.open('App3KeyStore', 1);
 
         request.onupgradeneeded = () => {
           const db = request.result;
+
           if (!db.objectStoreNames.contains('keys')) {
             db.createObjectStore('keys');
           }
@@ -90,6 +170,7 @@ block content
 
     async function saveKey(name, key) {
       const db = await openKeyDB();
+
       return new Promise((resolve, reject) => {
         const tx = db.transaction('keys', 'readwrite');
         tx.objectStore('keys').put(key, name);
@@ -100,12 +181,31 @@ block content
 
     async function getKey(name) {
       const db = await openKeyDB();
+
       return new Promise((resolve, reject) => {
         const tx = db.transaction('keys', 'readonly');
         const request = tx.objectStore('keys').get(name);
+
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
       });
+    }
+
+    async function deleteKey(name) {
+      const db = await openKeyDB();
+
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction('keys', 'readwrite');
+        tx.objectStore('keys').delete(name);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function clearLocalKeys(username) {
+      await deleteKey(`priv_${username}`);
+      await deleteKey(`pub_${username}`);
+      await deleteKey(`cert_version_${username}`);
     }
 
     function strToArrayBuffer(str) {
@@ -119,41 +219,35 @@ block content
     function abToBase64(buffer) {
       const bytes = new Uint8Array(buffer);
       let binary = '';
-      bytes.forEach(b => binary += String.fromCharCode(b));
+
+      bytes.forEach(b => {
+        binary += String.fromCharCode(b);
+      });
+
       return btoa(binary);
     }
 
     function base64ToAb(base64) {
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
+
       for (let i = 0; i < binary.length; i++) {
         bytes[i] = binary.charCodeAt(i);
       }
-      return bytes.buffer;
-    }
 
-    async function exportPublicKey(key) {
-      const spki = await crypto.subtle.exportKey('spki', key);
-      return abToBase64(spki);
+      return bytes.buffer;
     }
 
     async function importPublicKey(base64) {
       return crypto.subtle.importKey(
         'spki',
         base64ToAb(base64),
-        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        {
+          name: 'RSA-OAEP',
+          hash: 'SHA-256'
+        },
         true,
         ['encrypt']
-      );
-    }
-
-    async function importPrivateKey(base64) {
-      return crypto.subtle.importKey(
-        'pkcs8',
-        base64ToAb(base64),
-        { name: 'RSA-OAEP', hash: 'SHA-256' },
-        true,
-        ['decrypt']
       );
     }
 
@@ -174,7 +268,10 @@ block content
           hash: 'SHA-256'
         },
         passwordKey,
-        { name: 'AES-GCM', length: 256 },
+        {
+          name: 'AES-GCM',
+          length: 256
+        },
         false,
         ['decrypt']
       );
@@ -195,7 +292,10 @@ block content
       return crypto.subtle.importKey(
         'pkcs8',
         privateKeyRaw,
-        { name: 'RSA-OAEP', hash: 'SHA-256' },
+        {
+          name: 'RSA-OAEP',
+          hash: 'SHA-256'
+        },
         true,
         ['decrypt']
       );
@@ -204,13 +304,28 @@ block content
     async function getOrRequireCertificate() {
       const privName = `priv_${CURRENT_USER}`;
       const pubName = `pub_${CURRENT_USER}`;
+      const versionName = `cert_version_${CURRENT_USER}`;
 
       const privateKey = await getKey(privName);
       const publicKey = await getKey(pubName);
+      const localVersion = await getKey(versionName);
 
-      if (privateKey && publicKey) {
+      if (
+        privateKey &&
+        publicKey &&
+        Number(localVersion) === Number(ACTIVE_CERTIFICATE_VERSION)
+      ) {
         console.log('Claves cargadas desde IndexedDB');
-        return { privateKey, publicKey };
+        return {
+          privateKey,
+          publicKey
+        };
+      }
+
+      if (privateKey || publicKey || localVersion) {
+        console.warn('Certificado local obsoleto o incompleto. Se eliminarán las claves locales.');
+        await clearLocalKeys(CURRENT_USER);
+        alert('El certificado local no coincide con el certificado activo. Debes importar el certificado nuevo.');
       }
 
       showCertModal();
@@ -230,8 +345,22 @@ block content
         const certText = await file.text();
         const cert = JSON.parse(certText);
 
+        if (!cert.username || !cert.publicKey || !cert.encryptedPrivateKey || !cert.salt || !cert.iv) {
+          alert('El certificado no tiene un formato válido.');
+          return;
+        }
+
         if (cert.username !== CURRENT_USER) {
           alert('Este certificado no pertenece al usuario actual.');
+          return;
+        }
+
+        const certVersion = Number(cert.certificateVersion || 1);
+
+        if (certVersion !== Number(ACTIVE_CERTIFICATE_VERSION)) {
+          alert(
+            `Este certificado no es válido. Versión del certificado: ${certVersion}. Versión activa requerida: ${ACTIVE_CERTIFICATE_VERSION}.`
+          );
           return;
         }
 
@@ -240,11 +369,16 @@ block content
 
         await saveKey(`priv_${CURRENT_USER}`, privateKey);
         await saveKey(`pub_${CURRENT_USER}`, publicKey);
+        await saveKey(`cert_version_${CURRENT_USER}`, certVersion);
 
         await fetch('/auth3/public-key', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ publicKey: cert.publicKey })
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            publicKey: cert.publicKey
+          })
         });
 
         hideCertModal();
@@ -257,14 +391,22 @@ block content
 
     async function getRecipientPublicKey(username) {
       const res = await fetch(`/auth3/public-key/${username}`);
-      if (!res.ok) throw new Error('No se pudo obtener la clave pública');
+
+      if (!res.ok) {
+        throw new Error('No se pudo obtener la clave pública');
+      }
+
       const data = await res.json();
+
       return importPublicKey(data.publicKey);
     }
 
     async function encryptMessage(text, recipientPub, senderPub) {
       const aesKey = await crypto.subtle.generateKey(
-        { name: 'AES-GCM', length: 256 },
+        {
+          name: 'AES-GCM',
+          length: 256
+        },
         true,
         ['encrypt', 'decrypt']
       );
@@ -272,7 +414,10 @@ block content
       const iv = crypto.getRandomValues(new Uint8Array(12));
 
       const ciphertext = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
+        {
+          name: 'AES-GCM',
+          iv
+        },
         aesKey,
         strToArrayBuffer(text)
       );
@@ -280,13 +425,17 @@ block content
       const rawKey = await crypto.subtle.exportKey('raw', aesKey);
 
       const encRec = await crypto.subtle.encrypt(
-        { name: 'RSA-OAEP' },
+        {
+          name: 'RSA-OAEP'
+        },
         recipientPub,
         rawKey
       );
 
       const encSend = await crypto.subtle.encrypt(
-        { name: 'RSA-OAEP' },
+        {
+          name: 'RSA-OAEP'
+        },
         senderPub,
         rawKey
       );
@@ -305,7 +454,9 @@ block content
         : msg.encryptedKeyForSender;
 
       const rawKey = await crypto.subtle.decrypt(
-        { name: 'RSA-OAEP' },
+        {
+          name: 'RSA-OAEP'
+        },
         privateKey,
         base64ToAb(keyData)
       );
@@ -313,7 +464,9 @@ block content
       const aesKey = await crypto.subtle.importKey(
         'raw',
         rawKey,
-        { name: 'AES-GCM' },
+        {
+          name: 'AES-GCM'
+        },
         false,
         ['decrypt']
       );
@@ -359,49 +512,77 @@ block content
       }).join('');
     }
 
+    async function sendEncryptedMessage(text) {
+      if (!cachedKeys || !cachedRecipientPub) {
+        alert('Las claves todavía no están cargadas.');
+        return;
+      }
+
+      const enc = await encryptMessage(text, cachedRecipientPub, cachedKeys.publicKey);
+
+      const response = await fetch(`/message3/chat/${OTHER_USER}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(enc)
+      });
+
+      if (response.status === 429) {
+        pendingMessageText = text;
+        await loadCaptcha();
+        return;
+      }
+
+      if (!response.ok) {
+        alert('Error al enviar el mensaje');
+        return;
+      }
+
+      messageInput.value = '';
+      location.reload();
+    }
+
     async function init() {
-      const keys = await getOrRequireCertificate();
-      const recipientPub = await getRecipientPublicKey(OTHER_USER);
+      cachedKeys = await getOrRequireCertificate();
+      cachedRecipientPub = await getRecipientPublicKey(OTHER_USER);
 
       const decrypted = [];
 
       for (const msg of RAW_MESSAGES) {
         try {
-          const text = await decryptMessage(msg, keys.privateKey);
-          decrypted.push({ ...msg, text });
+          const text = await decryptMessage(msg, cachedKeys.privateKey);
+          decrypted.push({
+            ...msg,
+            text
+          });
         } catch {
-          decrypted.push({ ...msg, text: '[No se pudo descifrar]' });
+          decrypted.push({
+            ...msg,
+            text: '[No se pudo descifrar]'
+          });
         }
       }
 
       render(decrypted);
 
-      chatForm.addEventListener('submit', async (e) => {
+      chatForm.addEventListener('submit', async e => {
         e.preventDefault();
 
         const text = messageInput.value.trim();
-        if (!text || text.length >= LIMIT) return;
 
-        const enc = await encryptMessage(text, recipientPub, keys.publicKey);
-
-        const response = await fetch(`/message3/chat/${OTHER_USER}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(enc)
-        });
-
-        if (!response.ok) {
-          alert('Error al enviar el mensaje');
+        if (!text || text.length > LIMIT) {
           return;
         }
 
-        location.reload();
+        await sendEncryptedMessage(text);
       });
     }
 
     if (messageInput && charCount && charCounter && limitWarning && sendButton) {
       const updateCounter = () => {
         const length = messageInput.value.length;
+
         charCount.textContent = length;
 
         charCounter.classList.remove('warning', 'danger');
@@ -418,7 +599,10 @@ block content
           charCounter.classList.add('danger');
           messageInput.classList.add('input-danger');
           limitWarning.classList.add('show');
-          sendButton.disabled = true;
+
+          if (length > LIMIT) {
+            sendButton.disabled = true;
+          }
         }
       };
 
@@ -427,6 +611,14 @@ block content
     }
 
     installCertButton.addEventListener('click', installCertificate);
+    captchaButton.addEventListener('click', verifyCaptcha);
+
+    captchaAnswer.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        verifyCaptcha();
+      }
+    });
 
     init().catch(err => {
       console.error('Error inicializando E2EE:', err);

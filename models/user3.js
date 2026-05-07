@@ -9,16 +9,19 @@ const user3Schema = new mongoose.Schema({
     lowercase: true,
     unique: true
   },
+
   email: {
     type: String,
     required: true,
     trim: true,
     lowercase: true
   },
+
   password: {
     type: String,
     required: true
   },
+
   publicKey: {
     type: String,
     default: null
@@ -26,12 +29,27 @@ const user3Schema = new mongoose.Schema({
 
   mfaSecret: {
     type: String,
-    default:null
+    default: null
   },
 
   mfaEnabled: {
     type: Boolean,
     default: false
+  },
+
+  certificateVersion: {
+    type: Number,
+    default: 1
+  },
+
+  certificateRevokedAt: {
+    type: Date,
+    default: null
+  },
+
+  certificateUpdatedAt: {
+    type: Date,
+    default: Date.now
   }
 }, {
   collection: 'usuarios3'

@@ -13,12 +13,31 @@ block content
 
         form#registerForm.chat-form(action='/auth3/register' method='POST')
           input.chat-input(type='text' name='username' id='username' placeholder='Nombre de usuario' required)
-          input.chat-input(type='email' name='email' placeholder='Correo electrónico' required)
-          input.chat-input(type='password' name='password' id='password' placeholder='Contraseña (mínimo 8 caracteres)' required)
-          input(type='hidden' name='publicKey' id='publicKey')
-          button.chat-button(type='submit') Registrarse
+          input.chat-input(type='email' name='email' id='email' placeholder='Correo electrónico' required)
 
-        // ===== POPUP CERTIFICADO =====
+          input.chat-input(
+            type='password'
+            name='password'
+            id='password'
+            placeholder='Contraseña segura'
+            required
+          )
+
+          .policy-message#passwordMessage.hidden
+            | La contraseña todavía no cumple la política de seguridad.
+
+          .password-policy#passwordPolicy
+            p Política de contraseña:
+            ul
+              li#ruleLength Mínimo 10 caracteres
+              li#ruleUpper Al menos una mayúscula
+              li#ruleLower Al menos una minúscula
+              li#ruleNumber Al menos un número
+              li#ruleSymbol Al menos un carácter especial
+
+          input(type='hidden' name='publicKey' id='publicKey')
+          button#registerButton.chat-button(type='submit' disabled) Registrarse
+
         #certRegisterModal.cert-modal.hidden
           .cert-modal-content
             h2 Generación del certificado criptográfico
@@ -26,7 +45,7 @@ block content
             p Este certificado contiene tu clave privada cifrada y será necesario para operar desde este u otros equipos autorizados.
 
             ol
-              li Introduce una passphrase para proteger el certificado.
+              li Introduce una passphrase robusta para proteger el certificado.
               li Pulsa “Generar certificado”.
               li Guarda el archivo descargado en un lugar seguro.
               li Para usar otro equipo, importa este certificado.
@@ -34,8 +53,21 @@ block content
             p.cert-warning
               | ⚠️ Si pierdes el certificado o la passphrase, NO podrás recuperar tus mensajes.
 
-            input#certPassphrase(type='password' placeholder='Passphrase del certificado')
-            button#generateCertButton.chat-button(type='button') Generar certificado y registrar
+            input#certPassphrase(type='password' placeholder='Passphrase segura del certificado')
+
+            .policy-message#passphraseMessage.hidden
+              | La passphrase todavía no cumple la política de seguridad.
+
+            .password-policy#passphrasePolicy
+              p Política de passphrase:
+              ul
+                li#passRuleLength Mínimo 12 caracteres
+                li#passRuleUpper Al menos una mayúscula
+                li#passRuleLower Al menos una minúscula
+                li#passRuleNumber Al menos un número
+                li#passRuleSymbol Al menos un carácter especial
+
+            button#generateCertButton.chat-button(type='button' disabled) Generar certificado y registrar
 
   script.
     const registerForm = document.getElementById('registerForm');
@@ -44,11 +76,143 @@ block content
     const passInput = document.getElementById('certPassphrase');
     const publicKeyInput = document.getElementById('publicKey');
     const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const registerButton = document.getElementById('registerButton');
+
+    const passwordMessage = document.getElementById('passwordMessage');
+    const passphraseMessage = document.getElementById('passphraseMessage');
+
+    const ruleLength = document.getElementById('ruleLength');
+    const ruleUpper = document.getElementById('ruleUpper');
+    const ruleLower = document.getElementById('ruleLower');
+    const ruleNumber = document.getElementById('ruleNumber');
+    const ruleSymbol = document.getElementById('ruleSymbol');
+
+    const passRuleLength = document.getElementById('passRuleLength');
+    const passRuleUpper = document.getElementById('passRuleUpper');
+    const passRuleLower = document.getElementById('passRuleLower');
+    const passRuleNumber = document.getElementById('passRuleNumber');
+    const passRuleSymbol = document.getElementById('passRuleSymbol');
 
     let pendingSubmit = false;
 
+    function validatePassword(password) {
+      return {
+        length: password.length >= 10,
+        upper: /[A-Z]/.test(password),
+        lower: /[a-z]/.test(password),
+        number: /\d/.test(password),
+        symbol: /[^A-Za-z\d]/.test(password)
+      };
+    }
+
+    function isPasswordValid(password) {
+      const rules = validatePassword(password);
+      return rules.length && rules.upper && rules.lower && rules.number && rules.symbol;
+    }
+
+    function validatePassphrase(passphrase) {
+      return {
+        length: passphrase.length >= 12,
+        upper: /[A-Z]/.test(passphrase),
+        lower: /[a-z]/.test(passphrase),
+        number: /\d/.test(passphrase),
+        symbol: /[^A-Za-z\d]/.test(passphrase)
+      };
+    }
+
+    function isPassphraseValid(passphrase) {
+      const rules = validatePassphrase(passphrase);
+      return rules.length && rules.upper && rules.lower && rules.number && rules.symbol;
+    }
+
+    function setRuleState(element, valid) {
+      if (!element) return;
+
+      element.classList.remove('rule-ok', 'rule-bad');
+
+      if (valid) {
+        element.classList.add('rule-ok');
+      } else {
+        element.classList.add('rule-bad');
+      }
+    }
+
+    function showPolicyMessage(element) {
+      if (element) {
+        element.classList.remove('hidden');
+      }
+    }
+
+    function hidePolicyMessage(element) {
+      if (element) {
+        element.classList.add('hidden');
+      }
+    }
+
+    function updatePasswordState() {
+      const value = passwordInput.value;
+      const rules = validatePassword(value);
+      const valid = isPasswordValid(value);
+
+      setRuleState(ruleLength, rules.length);
+      setRuleState(ruleUpper, rules.upper);
+      setRuleState(ruleLower, rules.lower);
+      setRuleState(ruleNumber, rules.number);
+      setRuleState(ruleSymbol, rules.symbol);
+
+      passwordInput.classList.remove('input-danger');
+
+      if (value.length === 0) {
+        hidePolicyMessage(passwordMessage);
+      } else if (!valid) {
+        passwordInput.classList.add('input-danger');
+        showPolicyMessage(passwordMessage);
+      } else {
+        hidePolicyMessage(passwordMessage);
+      }
+
+      registerButton.disabled = !valid;
+    }
+
+    function updatePassphraseState() {
+      const value = passInput.value;
+      const rules = validatePassphrase(value);
+      const valid = isPassphraseValid(value);
+
+      setRuleState(passRuleLength, rules.length);
+      setRuleState(passRuleUpper, rules.upper);
+      setRuleState(passRuleLower, rules.lower);
+      setRuleState(passRuleNumber, rules.number);
+      setRuleState(passRuleSymbol, rules.symbol);
+
+      passInput.classList.remove('input-danger');
+
+      if (value.length === 0) {
+        hidePolicyMessage(passphraseMessage);
+      } else if (!valid) {
+        passInput.classList.add('input-danger');
+        showPolicyMessage(passphraseMessage);
+      } else {
+        hidePolicyMessage(passphraseMessage);
+      }
+
+      generateButton.disabled = !valid;
+    }
+
+    if (passwordInput && registerButton) {
+      passwordInput.addEventListener('input', updatePasswordState);
+      updatePasswordState();
+    }
+
+    if (passInput && generateButton) {
+      passInput.addEventListener('input', updatePassphraseState);
+      updatePassphraseState();
+    }
+
     function showCertModal() {
       certModal.classList.remove('hidden');
+      updatePassphraseState();
     }
 
     function hideCertModal() {
@@ -162,6 +326,16 @@ block content
     registerForm.addEventListener('submit', (e) => {
       if (!pendingSubmit) {
         e.preventDefault();
+
+        const password = passwordInput.value;
+
+        if (!isPasswordValid(password)) {
+          passwordInput.classList.add('input-danger');
+          showPolicyMessage(passwordMessage);
+          alert('La contraseña es insegura. Debe tener mínimo 10 caracteres, una mayúscula, una minúscula, un número y un carácter especial.');
+          return;
+        }
+
         showCertModal();
       }
     });
@@ -172,8 +346,10 @@ block content
       const passphrase = passInput.value.trim();
       const username = usernameInput.value.trim().toLowerCase();
 
-      if (!passphrase) {
-        alert('Introduce una passphrase');
+      if (!isPassphraseValid(passphrase)) {
+        passInput.classList.add('input-danger');
+        showPolicyMessage(passphraseMessage);
+        alert('La passphrase del certificado es insegura. Debe tener mínimo 12 caracteres, una mayúscula, una minúscula, un número y un carácter especial.');
         return;
       }
 

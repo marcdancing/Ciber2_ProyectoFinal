@@ -1,4 +1,4 @@
-extends ../layout
+extends ../layout3
 
 block content
   .chat-page
@@ -7,9 +7,13 @@ block content
         h1.chat-title= title
         .chat-actions
           span.session-user Usuario: #{username}
+          a.chat-link.danger-link(href='/auth3/revoke-certificate') Revocar certificado
           a.chat-link(href='/auth3/logout') Cerrar sesión
 
       .chat-body
+        .security-banner
+          span Canal cifrado extremo a extremo · Certificado de usuario requerido
+
         if !usuarios || usuarios.length === 0
           .empty-chat
             p No hay usuarios disponibles.
@@ -18,4 +22,6 @@ block content
             each usuario in usuarios
               a.contact-card(href=`/message3/chat/${usuario.username}`)
                 .contact-name= usuario.username
-                .contact-email= usuario.email
+                .contact-status
+                  span.status-dot
+                  span Canal seguro habilitado
