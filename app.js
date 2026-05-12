@@ -1,17 +1,18 @@
+require('dotenv').config();
 const createError = require('http-errors');
 const express = require('express');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 const logger = require('morgan');
 const session = require('express-session');
-const indexRouter = require('./routes/index');
+// const indexRouter = require('./routes/index');
 const usersRouter = require('./routes/users');
 const rutaMensaje1 = require('./routes/mensajes1');
 const rutaMensaje2 = require('./routes/mensajes2');
 const auth2Router = require('./routes/auth2');
 const auth3Router = require('./routes/auth3');
 const rutaMensaje3 = require('./routes/mensajes3');
-require('dotenv').config();
+
 
 const { connectDB2 } = require('./db2');connectDB2();
 
@@ -69,7 +70,7 @@ app.use(session({
 // Rutas
 
 
-app.use('/', indexRouter);
+//app.use('/', indexRouter);
 app.use('/users', usersRouter);
 
 app.use('/message1', rutaMensaje1);
@@ -104,11 +105,17 @@ app.use('/message3', require('./routes/mensajes3'));
 
 // APP 3 endurecimiento
 
-
+app.get('/', (req, res) => {
+  res.render('appSelector', {
+    title: 'Selector de aplicaciones'
+  });
+});
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
   next(createError(404));
 });
+
+
 
 // error handler
 app.use(function(err, req, res, next) {

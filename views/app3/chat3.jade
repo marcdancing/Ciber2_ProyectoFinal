@@ -58,7 +58,11 @@ block content
 
   script.
     const CURRENT_USER = !{JSON.stringify(username)};
+    const CURRENT_USER_ID = !{JSON.stringify(currentUserId)};
     const OTHER_USER = !{JSON.stringify(otroUsuario)};
+    const OTHER_USER_ID = !{JSON.stringify(otroUsuarioId)};
+    const CURRENT_USER_HASH = !{JSON.stringify(currentUserHash)};
+    const OTHER_USER_HASH = !{JSON.stringify(otherUserHash)};
     const RAW_MESSAGES = !{JSON.stringify(mensajes || [])};
     const ACTIVE_CERTIFICATE_VERSION = !{JSON.stringify(certificateVersion || 1)};
 
@@ -85,6 +89,8 @@ block content
     let cachedKeys = null;
     let cachedRecipientPub = null;
     let pendingMessageText = null;
+    let lastRenderedMessageSignature = '';
+    let pollingInterval = null;
 
     function showCertModal() {
       certModal.classList.remove('hidden');
@@ -389,8 +395,8 @@ block content
       }
     }
 
-    async function getRecipientPublicKey(username) {
-      const res = await fetch(`/auth3/public-key/${username}`);
+    async function getRecipientPublicKey(userId) {
+      const res = await fetch(`/auth3/public-key/user/${userId}`);
 
       if (!res.ok) {
         throw new Error('No se pudo obtener la clave pública');
@@ -449,7 +455,7 @@ block content
     }
 
     async function decryptMessage(msg, privateKey) {
-      const keyData = msg.to === CURRENT_USER
+      const keyData = msg.toUserHash === CURRENT_USER_HASH
         ? msg.encryptedKeyForRecipient
         : msg.encryptedKeyForSender;
 
@@ -496,13 +502,13 @@ block content
       }
 
       messagesContainer.innerHTML = messages.map(m => {
-        const mine = m.from === CURRENT_USER;
+        const mine = m.fromUserHash === CURRENT_USER_HASH;
 
         return `
           <div class="message-row ${mine ? 'mine' : 'theirs'}">
             <div class="message-bubble ${mine ? 'mine-bubble' : 'theirs-bubble'}">
               <div class="message-meta">
-                <span class="message-user">${mine ? 'Tú' : escapeHtml(m.from)}</span>
+                <span class="message-user">${mine ? 'Tú' : escapeHtml(OTHER_USER)}</span>
                 <span class="message-time">${escapeHtml(m.timestamp)}</span>
               </div>
               <p class="message-text">${escapeHtml(m.text)}</p>
@@ -510,6 +516,87 @@ block content
           </div>
         `;
       }).join('');
+
+      messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    function getMessageSignature(messages) {
+      return messages
+        .map(m => `${m.id}:${m.timestamp}`)
+        .join('|');
+    }
+
+    function notifyNewMessage() {
+      if (document.hidden) {
+        document.title = 'Nuevo mensaje · SecureGov';
+      }
+    }
+
+    async function loadMessagesSilently() {
+      if (!cachedKeys) {
+        return;
+      }
+
+      try {
+        const response = await fetch(`/message3/chat/${OTHER_USER_ID}/messages`);
+
+        if (!response.ok) {
+          console.warn('No se pudieron actualizar los mensajes');
+          return;
+        }
+
+        const data = await response.json();
+
+        if (!data.ok || !Array.isArray(data.mensajes)) {
+          return;
+        }
+
+        const signature = getMessageSignature(data.mensajes);
+
+        if (signature === lastRenderedMessageSignature) {
+          return;
+        }
+
+        const decrypted = [];
+
+        for (const msg of data.mensajes) {
+          try {
+            const text = await decryptMessage(msg, cachedKeys.privateKey);
+
+            decrypted.push({
+              ...msg,
+              text
+            });
+          } catch {
+            decrypted.push({
+              ...msg,
+              text: '[No se pudo descifrar]'
+            });
+          }
+        }
+
+        const lastMessage = data.mensajes[data.mensajes.length - 1];
+
+        render(decrypted);
+        lastRenderedMessageSignature = signature;
+
+        if (
+          lastMessage &&
+          lastMessage.fromUserHash !== CURRENT_USER_HASH
+        ) {
+          notifyNewMessage();
+        }
+      } catch (error) {
+        console.error('Error actualizando mensajes:', error);
+      }
+    }
+
+    function startMessagePolling() {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+
+      pollingInterval = setInterval(loadMessagesSilently, 3000);
     }
 
     async function sendEncryptedMessage(text) {
@@ -520,7 +607,7 @@ block content
 
       const enc = await encryptMessage(text, cachedRecipientPub, cachedKeys.publicKey);
 
-      const response = await fetch(`/message3/chat/${OTHER_USER}`, {
+      const response = await fetch(`/message3/chat/${OTHER_USER_ID}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -540,12 +627,12 @@ block content
       }
 
       messageInput.value = '';
-      location.reload();
+      await loadMessagesSilently();
     }
 
     async function init() {
       cachedKeys = await getOrRequireCertificate();
-      cachedRecipientPub = await getRecipientPublicKey(OTHER_USER);
+      cachedRecipientPub = await getRecipientPublicKey(OTHER_USER_ID);
 
       const decrypted = [];
 
@@ -565,6 +652,8 @@ block content
       }
 
       render(decrypted);
+      lastRenderedMessageSignature = getMessageSignature(RAW_MESSAGES);
+      startMessagePolling();
 
       chatForm.addEventListener('submit', async e => {
         e.preventDefault();
@@ -617,6 +706,18 @@ block content
       if (e.key === 'Enter') {
         e.preventDefault();
         verifyCaptcha();
+      }
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        document.title = 'SecureGov';
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
       }
     });
 

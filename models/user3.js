@@ -1,20 +1,35 @@
 const mongoose = require('mongoose');
 const { getDB3 } = require('../db3');
 
+const encryptedFieldSchema = new mongoose.Schema({
+  iv: { type: String, required: true },
+  ciphertext: { type: String, required: true },
+  tag: { type: String, required: true }
+}, { _id: false });
+
 const user3Schema = new mongoose.Schema({
-  username: {
+  usernameHash: {
     type: String,
     required: true,
-    trim: true,
-    lowercase: true,
-    unique: true
+    unique: true,
+    index: true
   },
 
-  email: {
+  emailHash: {
     type: String,
     required: true,
-    trim: true,
-    lowercase: true
+    unique: true,
+    index: true
+  },
+
+  usernameEncrypted: {
+    type: encryptedFieldSchema,
+    required: true
+  },
+
+  emailEncrypted: {
+    type: encryptedFieldSchema,
+    required: true
   },
 
   password: {

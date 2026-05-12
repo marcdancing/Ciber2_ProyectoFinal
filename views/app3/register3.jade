@@ -23,8 +23,19 @@ block content
             required
           )
 
+          input.chat-input(
+            type='password'
+            name='passwordConfirm'
+            id='passwordConfirm'
+            placeholder='Repite la contraseña'
+            required
+          )
+
           .policy-message#passwordMessage.hidden
             | La contraseña todavía no cumple la política de seguridad.
+
+          .policy-message#passwordMatchMessage.hidden
+            | Las contraseñas no coinciden.
 
           .password-policy#passwordPolicy
             p Política de contraseña:
@@ -34,6 +45,7 @@ block content
               li#ruleLower Al menos una minúscula
               li#ruleNumber Al menos un número
               li#ruleSymbol Al menos un carácter especial
+              li#rulePasswordMatch Las dos contraseñas deben coincidir
 
           input(type='hidden' name='publicKey' id='publicKey')
           button#registerButton.chat-button(type='submit' disabled) Registrarse
@@ -46,6 +58,7 @@ block content
 
             ol
               li Introduce una passphrase robusta para proteger el certificado.
+              li Repite la passphrase para evitar errores.
               li Pulsa “Generar certificado”.
               li Guarda el archivo descargado en un lugar seguro.
               li Para usar otro equipo, importa este certificado.
@@ -54,9 +67,13 @@ block content
               | ⚠️ Si pierdes el certificado o la passphrase, NO podrás recuperar tus mensajes.
 
             input#certPassphrase(type='password' placeholder='Passphrase segura del certificado')
+            input#certPassphraseConfirm(type='password' placeholder='Repite la passphrase del certificado')
 
             .policy-message#passphraseMessage.hidden
               | La passphrase todavía no cumple la política de seguridad.
+
+            .policy-message#passphraseMatchMessage.hidden
+              | Las passphrases no coinciden.
 
             .password-policy#passphrasePolicy
               p Política de passphrase:
@@ -66,6 +83,7 @@ block content
                 li#passRuleLower Al menos una minúscula
                 li#passRuleNumber Al menos un número
                 li#passRuleSymbol Al menos un carácter especial
+                li#passRuleMatch Las dos passphrases deben coincidir
 
             button#generateCertButton.chat-button(type='button' disabled) Generar certificado y registrar
 
@@ -73,28 +91,41 @@ block content
     const registerForm = document.getElementById('registerForm');
     const certModal = document.getElementById('certRegisterModal');
     const generateButton = document.getElementById('generateCertButton');
+
     const passInput = document.getElementById('certPassphrase');
+    const passConfirmInput = document.getElementById('certPassphraseConfirm');
+
     const publicKeyInput = document.getElementById('publicKey');
     const usernameInput = document.getElementById('username');
     const passwordInput = document.getElementById('password');
+    const passwordConfirmInput = document.getElementById('passwordConfirm');
     const registerButton = document.getElementById('registerButton');
 
     const passwordMessage = document.getElementById('passwordMessage');
+    const passwordMatchMessage = document.getElementById('passwordMatchMessage');
+
     const passphraseMessage = document.getElementById('passphraseMessage');
+    const passphraseMatchMessage = document.getElementById('passphraseMatchMessage');
 
     const ruleLength = document.getElementById('ruleLength');
     const ruleUpper = document.getElementById('ruleUpper');
     const ruleLower = document.getElementById('ruleLower');
     const ruleNumber = document.getElementById('ruleNumber');
     const ruleSymbol = document.getElementById('ruleSymbol');
+    const rulePasswordMatch = document.getElementById('rulePasswordMatch');
 
     const passRuleLength = document.getElementById('passRuleLength');
     const passRuleUpper = document.getElementById('passRuleUpper');
     const passRuleLower = document.getElementById('passRuleLower');
     const passRuleNumber = document.getElementById('passRuleNumber');
     const passRuleSymbol = document.getElementById('passRuleSymbol');
+    const passRuleMatch = document.getElementById('passRuleMatch');
 
     let pendingSubmit = false;
+
+    function normalizeUsername(value) {
+      return String(value || '').trim().toLowerCase();
+    }
 
     function validatePassword(password) {
       return {
@@ -106,9 +137,19 @@ block content
       };
     }
 
-    function isPasswordValid(password) {
+    function isPasswordPolicyValid(password) {
       const rules = validatePassword(password);
       return rules.length && rules.upper && rules.lower && rules.number && rules.symbol;
+    }
+
+    function arePasswordsMatching() {
+      return passwordInput.value.length > 0 &&
+        passwordConfirmInput.value.length > 0 &&
+        passwordInput.value === passwordConfirmInput.value;
+    }
+
+    function isPasswordValid(password) {
+      return isPasswordPolicyValid(password) && arePasswordsMatching();
     }
 
     function validatePassphrase(passphrase) {
@@ -121,9 +162,19 @@ block content
       };
     }
 
-    function isPassphraseValid(passphrase) {
+    function isPassphrasePolicyValid(passphrase) {
       const rules = validatePassphrase(passphrase);
       return rules.length && rules.upper && rules.lower && rules.number && rules.symbol;
+    }
+
+    function arePassphrasesMatching() {
+      return passInput.value.length > 0 &&
+        passConfirmInput.value.length > 0 &&
+        passInput.value === passConfirmInput.value;
+    }
+
+    function isPassphraseValid(passphrase) {
+      return isPassphrasePolicyValid(passphrase) && arePassphrasesMatching();
     }
 
     function setRuleState(element, valid) {
@@ -151,64 +202,92 @@ block content
     }
 
     function updatePasswordState() {
-      const value = passwordInput.value;
-      const rules = validatePassword(value);
-      const valid = isPasswordValid(value);
+      const password = passwordInput.value;
+      const passwordConfirm = passwordConfirmInput.value;
+
+      const rules = validatePassword(password);
+      const policyValid = isPasswordPolicyValid(password);
+      const passwordsMatch = arePasswordsMatching();
+      const valid = policyValid && passwordsMatch;
 
       setRuleState(ruleLength, rules.length);
       setRuleState(ruleUpper, rules.upper);
       setRuleState(ruleLower, rules.lower);
       setRuleState(ruleNumber, rules.number);
       setRuleState(ruleSymbol, rules.symbol);
+      setRuleState(rulePasswordMatch, passwordsMatch);
 
       passwordInput.classList.remove('input-danger');
+      passwordConfirmInput.classList.remove('input-danger');
 
-      if (value.length === 0) {
+      if (password.length === 0) {
         hidePolicyMessage(passwordMessage);
-      } else if (!valid) {
+      } else if (!policyValid) {
         passwordInput.classList.add('input-danger');
         showPolicyMessage(passwordMessage);
       } else {
         hidePolicyMessage(passwordMessage);
       }
 
+      if (passwordConfirm.length === 0) {
+        hidePolicyMessage(passwordMatchMessage);
+      } else if (!passwordsMatch) {
+        passwordConfirmInput.classList.add('input-danger');
+        showPolicyMessage(passwordMatchMessage);
+      } else {
+        hidePolicyMessage(passwordMatchMessage);
+      }
+
       registerButton.disabled = !valid;
     }
 
     function updatePassphraseState() {
-      const value = passInput.value;
-      const rules = validatePassphrase(value);
-      const valid = isPassphraseValid(value);
+      const passphrase = passInput.value;
+      const passphraseConfirm = passConfirmInput.value;
+
+      const rules = validatePassphrase(passphrase);
+      const policyValid = isPassphrasePolicyValid(passphrase);
+      const passphrasesMatch = arePassphrasesMatching();
+      const valid = policyValid && passphrasesMatch;
 
       setRuleState(passRuleLength, rules.length);
       setRuleState(passRuleUpper, rules.upper);
       setRuleState(passRuleLower, rules.lower);
       setRuleState(passRuleNumber, rules.number);
       setRuleState(passRuleSymbol, rules.symbol);
+      setRuleState(passRuleMatch, passphrasesMatch);
 
       passInput.classList.remove('input-danger');
+      passConfirmInput.classList.remove('input-danger');
 
-      if (value.length === 0) {
+      if (passphrase.length === 0) {
         hidePolicyMessage(passphraseMessage);
-      } else if (!valid) {
+      } else if (!policyValid) {
         passInput.classList.add('input-danger');
         showPolicyMessage(passphraseMessage);
       } else {
         hidePolicyMessage(passphraseMessage);
       }
 
+      if (passphraseConfirm.length === 0) {
+        hidePolicyMessage(passphraseMatchMessage);
+      } else if (!passphrasesMatch) {
+        passConfirmInput.classList.add('input-danger');
+        showPolicyMessage(passphraseMatchMessage);
+      } else {
+        hidePolicyMessage(passphraseMatchMessage);
+      }
+
       generateButton.disabled = !valid;
     }
 
-    if (passwordInput && registerButton) {
-      passwordInput.addEventListener('input', updatePasswordState);
-      updatePasswordState();
-    }
+    passwordInput.addEventListener('input', updatePasswordState);
+    passwordConfirmInput.addEventListener('input', updatePasswordState);
+    passInput.addEventListener('input', updatePassphraseState);
+    passConfirmInput.addEventListener('input', updatePassphraseState);
 
-    if (passInput && generateButton) {
-      passInput.addEventListener('input', updatePassphraseState);
-      updatePassphraseState();
-    }
+    updatePasswordState();
+    updatePassphraseState();
 
     function showCertModal() {
       certModal.classList.remove('hidden');
@@ -226,7 +305,11 @@ block content
     function abToBase64(buffer) {
       const bytes = new Uint8Array(buffer);
       let binary = '';
-      bytes.forEach(b => binary += String.fromCharCode(b));
+
+      bytes.forEach(b => {
+        binary += String.fromCharCode(b);
+      });
+
       return btoa(binary);
     }
 
@@ -266,6 +349,8 @@ block content
     }
 
     async function generateCertificate(username, passphrase) {
+      const normalizedUsername = normalizeUsername(username);
+
       const keyPair = await crypto.subtle.generateKey(
         {
           name: 'RSA-OAEP',
@@ -286,18 +371,22 @@ block content
       const aesKey = await deriveKey(passphrase, salt);
 
       const encryptedPrivateKey = await crypto.subtle.encrypt(
-        { name: 'AES-GCM', iv },
+        {
+          name: 'AES-GCM',
+          iv
+        },
         aesKey,
         privateKeyRaw
       );
 
       return {
-        username,
+        username: normalizedUsername,
         publicKey,
         encryptedPrivateKey: abToBase64(encryptedPrivateKey),
         salt: abToBase64(salt.buffer),
         iv: abToBase64(iv.buffer),
         algorithm: 'RSA-OAEP + AES-GCM + PBKDF2',
+        certificateVersion: 1,
         createdAt: new Date().toISOString()
       };
     }
@@ -311,7 +400,7 @@ block content
       const a = document.createElement('a');
 
       a.href = url;
-      a.download = `certificado-${cert.username}-app3.secmsg`;
+      a.download = `certificado-${cert.username}-app3-v${cert.certificateVersion}.secmsg`;
       a.style.display = 'none';
 
       document.body.appendChild(a);
@@ -329,10 +418,17 @@ block content
 
         const password = passwordInput.value;
 
-        if (!isPasswordValid(password)) {
+        if (!isPasswordPolicyValid(password)) {
           passwordInput.classList.add('input-danger');
           showPolicyMessage(passwordMessage);
           alert('La contraseña es insegura. Debe tener mínimo 10 caracteres, una mayúscula, una minúscula, un número y un carácter especial.');
+          return;
+        }
+
+        if (!arePasswordsMatching()) {
+          passwordConfirmInput.classList.add('input-danger');
+          showPolicyMessage(passwordMatchMessage);
+          alert('Las contraseñas no coinciden.');
           return;
         }
 
@@ -344,12 +440,24 @@ block content
       e.preventDefault();
 
       const passphrase = passInput.value.trim();
-      const username = usernameInput.value.trim().toLowerCase();
+      const username = normalizeUsername(usernameInput.value);
 
-      if (!isPassphraseValid(passphrase)) {
+      if (!username) {
+        alert('Introduce un nombre de usuario válido.');
+        return;
+      }
+
+      if (!isPassphrasePolicyValid(passphrase)) {
         passInput.classList.add('input-danger');
         showPolicyMessage(passphraseMessage);
         alert('La passphrase del certificado es insegura. Debe tener mínimo 12 caracteres, una mayúscula, una minúscula, un número y un carácter especial.');
+        return;
+      }
+
+      if (!arePassphrasesMatching()) {
+        passConfirmInput.classList.add('input-danger');
+        showPolicyMessage(passphraseMatchMessage);
+        alert('Las passphrases del certificado no coinciden.');
         return;
       }
 
@@ -365,7 +473,6 @@ block content
           hideCertModal();
           registerForm.submit();
         }, 400);
-
       } catch (err) {
         console.error(err);
         alert('Error generando certificado');

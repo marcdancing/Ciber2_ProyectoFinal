@@ -2,32 +2,38 @@ const mongoose = require('mongoose');
 const { getDB3 } = require('../db3');
 
 const message3Schema = new mongoose.Schema({
-  from: {
+  fromUserHash: {
     type: String,
     required: true,
-    trim: true
+    index: true
   },
-  to: {
+
+  toUserHash: {
     type: String,
     required: true,
-    trim: true
+    index: true
   },
+
   ciphertext: {
     type: String,
     required: true
   },
+
   iv: {
     type: String,
     required: true
   },
+
   encryptedKeyForRecipient: {
     type: String,
     required: true
   },
+
   encryptedKeyForSender: {
     type: String,
     required: true
   },
+
   timestamp: {
     type: String,
     required: true

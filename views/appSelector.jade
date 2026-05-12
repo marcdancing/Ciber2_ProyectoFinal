@@ -1,0 +1,90 @@
+extends layoutApps 
+
+block content
+  .selector-page
+    .selector-shell
+      header.selector-header
+        .selector-brand
+          .selector-logo
+            span 🛡️
+          .selector-brand-text
+            strong Proyecto SecureGov
+            span Ciberseguridad & Privacidad
+
+        .selector-header-badge
+          span Seguridad como prioridad
+
+      main.selector-main
+        .selector-title-block
+          h1 Selector de aplicaciones
+          .selector-divider
+            span
+          p Demostración comparativa de seguridad entre tres versiones de una aplicación de mensajería.
+
+        .apps-grid
+          .app-card.app-card-low
+            .app-card-glow
+            .app-icon.app-icon-low
+              span 🔓
+
+            h2 Aplicación 1
+
+            .app-level.level-low Seguridad baja
+
+            p.app-description
+              | Versión vulnerable e insegura. Sin autenticación robusta, sin cifrado extremo a extremo y con mayor exposición ante ataques.
+
+            ul.app-features
+              li Sin protección avanzada
+              li Mayor riesgo de exposición
+              li Entorno demostrativo vulnerable
+
+            a.app-button.app-button-low(href='/message1')
+              span.button-icon →
+              span Entrar en la App 1
+
+          .app-card.app-card-medium
+            .app-card-glow
+            .app-icon.app-icon-medium
+              span 🔐
+
+            h2 Aplicación 2
+
+            .app-level.level-medium Seguridad media
+
+            p.app-description
+              | Versión intermedia con autenticación, sesiones y almacenamiento en base de datos, pero todavía sin protección completa.
+
+            ul.app-features
+              li Login y sesiones
+              li Control básico de acceso
+              li Riesgo moderado
+
+            a.app-button.app-button-medium(href='/auth2/login')
+              span.button-icon →
+              span Entrar en la App 2
+
+          .app-card.app-card-high
+            .app-card-glow
+            .app-icon.app-icon-high
+              span ✅
+
+            h2 Aplicación 3
+
+            .app-level.level-high Seguridad alta
+
+            p.app-description
+              | Versión segura con MFA, certificados de usuario, cifrado extremo a extremo, bcrypt, CAPTCHA y protección de identidades.
+
+            ul.app-features
+              li MFA y bcrypt
+              li Cifrado extremo a extremo
+              li Certificado criptográfico
+
+            a.app-button.app-button-high(href='/auth3/login')
+              span.button-icon →
+              span Entrar en la App 3
+
+        .selector-note
+          span.info-icon i
+          p Este entorno es solo demostrativo. Las tres aplicaciones permiten comparar diferentes niveles de seguridad.

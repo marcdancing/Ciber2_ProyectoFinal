@@ -1,11 +1,16 @@
 const express = require('express');
 const svgCaptcha = require('svg-captcha');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
 const getMessage3Model = require('../models/message3');
 const getUser3Model = require('../models/User3');
+const {
+  decryptIdentity,
+  hashInternalId
+} = require('../utils/identityProtection');
 
 const MESSAGE_LIMIT = 5;
 const MESSAGE_WINDOW_MS = 30 * 1000;
@@ -21,6 +26,10 @@ function requireAuth3(req, res, next) {
   }
 
   next();
+}
+
+function isValidObjectId(id) {
+  return mongoose.Types.ObjectId.isValid(id);
 }
 
 function checkMessageRateLimit(req) {
@@ -67,9 +76,25 @@ router.get('/inbox', requireAuth3, async (req, res) => {
   try {
     const User3 = getUser3Model();
 
-    const usuarios = await User3.find({
-      username: { $ne: req.session.user3.username }
-    }).sort({ username: 1 });
+    const usuariosRaw = await User3.find({
+      _id: { $ne: req.session.user3.id }
+    }).sort({ _id: 1 });
+
+    const usuarios = usuariosRaw
+      .map(user => {
+        const username = decryptIdentity(user.usernameEncrypted);
+
+        if (!username) {
+          return null;
+        }
+
+        return {
+          id: String(user._id),
+          username,
+          certificateVersion: user.certificateVersion || 1
+        };
+      })
+      .filter(Boolean);
 
     res.render('app3/inbox3', {
       title: 'Bandeja App 3',
@@ -82,25 +107,21 @@ router.get('/inbox', requireAuth3, async (req, res) => {
   }
 });
 
-// // Ver chat con un usuario concreto
-
-// Ver chat con un usuario concreto
-router.get('/chat/:username', requireAuth3, async (req, res) => {
+// Ver chat con un usuario concreto// Ver chat con un usuario concreto
+router.get('/chat/:userId', requireAuth3, async (req, res) => {
   try {
     const Message3 = getMessage3Model();
     const User3 = getUser3Model();
 
-    const otroUsuario = req.params.username?.trim().toLowerCase();
+    const otroUsuarioId = req.params.userId;
 
-    if (!otroUsuario) {
-      req.session.error = 'Usuario no válido';
+    if (!otroUsuarioId) {
+      req.session.error = 'Identificador de usuario no válido';
       return res.redirect('/message3/inbox');
     }
 
-    const existeUsuario = await User3.findOne({ username: otroUsuario });
-
-    if (!existeUsuario) {
-      req.session.error = 'El usuario seleccionado no existe';
+    if (String(otroUsuarioId) === String(req.session.user3.id)) {
+      req.session.error = 'No puedes abrir un chat contigo mismo';
       return res.redirect('/message3/inbox');
     }
 
@@ -111,79 +132,92 @@ router.get('/chat/:username', requireAuth3, async (req, res) => {
       return res.redirect('/auth3/login');
     }
 
-    const mensajes = await Message3.find({
+    const existeUsuario = await User3.findById(otroUsuarioId);
+
+    if (!existeUsuario) {
+      req.session.error = 'El usuario seleccionado no existe';
+      return res.redirect('/message3/inbox');
+    }
+
+    const otroUsuarioNombre = decryptIdentity(existeUsuario.usernameEncrypted);
+
+    if (!otroUsuarioNombre) {
+      req.session.error = 'No se pudo recuperar la identidad del usuario seleccionado';
+      return res.redirect('/message3/inbox');
+    }
+
+    const currentUserHash = hashInternalId(currentUser._id);
+    const otherUserHash = hashInternalId(existeUsuario._id);
+
+    const mensajesRaw = await Message3.find({
       $or: [
-        { from: req.session.user3.username, to: otroUsuario },
-        { from: otroUsuario, to: req.session.user3.username }
+        { fromUserHash: currentUserHash, toUserHash: otherUserHash },
+        { fromUserHash: otherUserHash, toUserHash: currentUserHash }
       ]
     }).sort({ _id: 1 });
+
+    const mensajes = mensajesRaw.map(msg => ({
+      id: String(msg._id),
+      fromUserHash: msg.fromUserHash,
+      toUserHash: msg.toUserHash,
+      ciphertext: msg.ciphertext,
+      iv: msg.iv,
+      encryptedKeyForRecipient: msg.encryptedKeyForRecipient,
+      encryptedKeyForSender: msg.encryptedKeyForSender,
+      timestamp: msg.timestamp
+    }));
 
     const error = req.session.error || null;
     req.session.error = null;
 
     res.render('app3/chat3', {
-      title: `Chat con ${otroUsuario}`,
+      title: 'Chat seguro',
       username: req.session.user3.username,
-      otroUsuario,
+      currentUserId: String(currentUser._id),
+      otroUsuarioId: String(existeUsuario._id),
+      currentUserHash,
+      otherUserHash,
+      otroUsuario: otroUsuarioNombre,
       mensajes,
       error,
       certificateVersion: currentUser.certificateVersion || 1
     });
   } catch (error) {
-    console.error('ERROR EN /message3/chat/:username:', error);
+    console.error('ERROR EN /message3/chat/:userId:', error);
     res.status(500).send('Error al cargar el chat');
   }
 });
-// router.get('/chat/:username', requireAuth3, async (req, res) => {
-//   try {
-//     const Message3 = getMessage3Model();
-//     const User3 = getUser3Model();
-
-//     const otroUsuario = req.params.username?.trim().toLowerCase();
-
-//     const existeUsuario = await User3.findOne({ username: otroUsuario });
-
-//     if (!existeUsuario) {
-//       req.session.error = 'El usuario seleccionado no existe';
-//       return res.redirect('/message3/inbox');
-//     }
-
-//     const mensajes = await Message3.find({
-//       $or: [
-//         { from: req.session.user3.username, to: otroUsuario },
-//         { from: otroUsuario, to: req.session.user3.username }
-//       ]
-//     }).sort({ _id: 1 });
-
-//     const error = req.session.error || null;
-//     req.session.error = null;
-
-//     res.render('app3/chat3', {
-//       title: `Chat con ${otroUsuario}`,
-//       username: req.session.user3.username,
-//       otroUsuario,
-//       mensajes,
-//       error,
-//       certificateVersion: currentUser?.certificateVersion || 1,
-//     });
-//   } catch (error) {
-//     console.error('ERROR EN /message3/chat/:username:', error);
-//     res.status(500).send('Error al cargar el chat');
-//   }
-// });
 
 // Guardar mensaje ya cifrado desde cliente
-router.post('/chat/:username', requireAuth3, async (req, res) => {
+router.post('/chat/:userId', requireAuth3, async (req, res) => {
   try {
     const Message3 = getMessage3Model();
     const User3 = getUser3Model();
 
-    const otroUsuario = req.params.username?.trim().toLowerCase();
+    const otroUsuarioId = req.params.userId;
 
-    const existeUsuario = await User3.findOne({ username: otroUsuario });
-    
+    if (!isValidObjectId(otroUsuarioId)) {
+      return res.status(400).json({
+        error: 'Identificador de usuario no válido'
+      });
+    }
 
-    if (!existeUsuario) {
+    if (String(otroUsuarioId) === String(req.session.user3.id)) {
+      return res.status(400).json({
+        error: 'No puedes enviarte mensajes a ti mismo'
+      });
+    }
+
+    const currentUser = await User3.findById(req.session.user3.id);
+    const destinatario = await User3.findById(otroUsuarioId);
+
+    if (!currentUser) {
+      return res.status(401).json({
+        error: 'Usuario actual no válido'
+      });
+    }
+
+    if (!destinatario) {
       return res.status(404).json({
         error: 'El usuario destinatario no existe'
       });
@@ -218,8 +252,8 @@ router.post('/chat/:username', requireAuth3, async (req, res) => {
     }
 
     const nuevoMensaje = new Message3({
-      from: req.session.user3.username,
-      to: otroUsuario,
+      fromUserHash: hashInternalId(currentUser._id),
+      toUserHash: hashInternalId(destinatario._id),
       ciphertext,
       iv,
       encryptedKeyForRecipient,
@@ -231,76 +265,156 @@ router.post('/chat/:username', requireAuth3, async (req, res) => {
 
     res.json({ ok: true });
   } catch (error) {
-    console.error('ERROR EN POST /message3/chat/:username:', error);
-    res.status(500).json({ error: 'Error al enviar mensaje' });
+    console.error('ERROR EN POST /message3/chat/:userId:', error);
+    res.status(500).json({
+      error: 'Error al enviar mensaje'
+    });
   }
 });
 
+// Obtener mensajes cifrados del chat sin recargar la página
+router.get('/chat/:userId/messages', requireAuth3, async (req, res) => {
+  try {
+    const Message3 = getMessage3Model();
+    const User3 = getUser3Model();
+
+    const otroUsuarioId = req.params.userId;
+
+    if (!otroUsuarioId) {
+      return res.status(400).json({
+        error: 'Identificador de usuario no válido'
+      });
+    }
+
+    if (String(otroUsuarioId) === String(req.session.user3.id)) {
+      return res.status(400).json({
+        error: 'No puedes abrir un chat contigo mismo'
+      });
+    }
+
+    const currentUser = await User3.findById(req.session.user3.id);
+    const existeUsuario = await User3.findById(otroUsuarioId);
+
+    if (!currentUser || !existeUsuario) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado'
+      });
+    }
+
+    const currentUserHash = hashInternalId(currentUser._id);
+    const otherUserHash = hashInternalId(existeUsuario._id);
+
+    const mensajesRaw = await Message3.find({
+      $or: [
+        { fromUserHash: currentUserHash, toUserHash: otherUserHash },
+        { fromUserHash: otherUserHash, toUserHash: currentUserHash }
+      ]
+    }).sort({ _id: 1 });
+
+    const mensajes = mensajesRaw.map(msg => ({
+      id: String(msg._id),
+      fromUserHash: msg.fromUserHash,
+      toUserHash: msg.toUserHash,
+      ciphertext: msg.ciphertext,
+      iv: msg.iv,
+      encryptedKeyForRecipient: msg.encryptedKeyForRecipient,
+      encryptedKeyForSender: msg.encryptedKeyForSender,
+      timestamp: msg.timestamp
+    }));
+
+    res.json({
+      ok: true,
+      mensajes
+    });
+  } catch (error) {
+    console.error('ERROR EN GET /message3/chat/:userId/messages:', error);
+    res.status(500).json({
+      error: 'Error obteniendo mensajes'
+    });
+  }
+});
+
+
 // Generar CAPTCHA gráfico
 router.get('/captcha', requireAuth3, (req, res) => {
-  const captcha = generateSecureCaptcha();
+  try {
+    const captcha = generateSecureCaptcha();
 
-  req.session.captchaHash = hashCaptchaAnswer(captcha.text);
-  req.session.captchaCreatedAt = Date.now();
-  req.session.captchaAttempts = 0;
+    req.session.captchaHash = hashCaptchaAnswer(captcha.text);
+    req.session.captchaCreatedAt = Date.now();
+    req.session.captchaAttempts = 0;
 
-  res.json({
-    svg: captcha.data
-  });
+    res.json({
+      svg: captcha.data
+    });
+  } catch (error) {
+    console.error('ERROR generando CAPTCHA:', error);
+    res.status(500).json({
+      error: 'Error generando CAPTCHA'
+    });
+  }
 });
 
 // Verificar CAPTCHA gráfico
 router.post('/captcha', requireAuth3, (req, res) => {
-  const answer = req.body.answer?.trim();
+  try {
+    const answer = req.body.answer?.trim();
 
-  if (!req.session.captchaHash || !req.session.captchaCreatedAt) {
-    return res.status(400).json({
-      ok: false,
-      error: 'CAPTCHA no inicializado'
-    });
-  }
+    if (!req.session.captchaHash || !req.session.captchaCreatedAt) {
+      return res.status(400).json({
+        ok: false,
+        error: 'CAPTCHA no inicializado'
+      });
+    }
 
-  const expired =
-    Date.now() - req.session.captchaCreatedAt > CAPTCHA_EXPIRATION_MS;
+    const expired =
+      Date.now() - req.session.captchaCreatedAt > CAPTCHA_EXPIRATION_MS;
 
-  if (expired) {
+    if (expired) {
+      req.session.captchaHash = null;
+      req.session.captchaCreatedAt = null;
+      req.session.captchaAttempts = 0;
+
+      return res.status(400).json({
+        ok: false,
+        error: 'CAPTCHA expirado'
+      });
+    }
+
+    req.session.captchaAttempts = (req.session.captchaAttempts || 0) + 1;
+
+    if (req.session.captchaAttempts > MAX_CAPTCHA_ATTEMPTS) {
+      req.session.captchaHash = null;
+      req.session.captchaCreatedAt = null;
+      req.session.captchaAttempts = 0;
+
+      return res.status(429).json({
+        ok: false,
+        error: 'Demasiados intentos de CAPTCHA'
+      });
+    }
+
+    if (!answer || hashCaptchaAnswer(answer) !== req.session.captchaHash) {
+      return res.status(400).json({
+        ok: false,
+        error: 'CAPTCHA incorrecto'
+      });
+    }
+
+    req.session.captchaSolvedAt = Date.now();
     req.session.captchaHash = null;
     req.session.captchaCreatedAt = null;
     req.session.captchaAttempts = 0;
+    req.session.messageTimestamps = [];
 
-    return res.status(400).json({
+    res.json({ ok: true });
+  } catch (error) {
+    console.error('ERROR verificando CAPTCHA:', error);
+    res.status(500).json({
       ok: false,
-      error: 'CAPTCHA expirado'
+      error: 'Error verificando CAPTCHA'
     });
   }
-
-  req.session.captchaAttempts = (req.session.captchaAttempts || 0) + 1;
-
-  if (req.session.captchaAttempts > MAX_CAPTCHA_ATTEMPTS) {
-    req.session.captchaHash = null;
-    req.session.captchaCreatedAt = null;
-    req.session.captchaAttempts = 0;
-
-    return res.status(429).json({
-      ok: false,
-      error: 'Demasiados intentos de CAPTCHA'
-    });
-  }
-
-  if (!answer || hashCaptchaAnswer(answer) !== req.session.captchaHash) {
-    return res.status(400).json({
-      ok: false,
-      error: 'CAPTCHA incorrecto'
-    });
-  }
-
-  req.session.captchaSolvedAt = Date.now();
-  req.session.captchaHash = null;
-  req.session.captchaCreatedAt = null;
-  req.session.captchaAttempts = 0;
-  req.session.messageTimestamps = [];
-
-  res.json({ ok: true });
 });
 
 module.exports = router;

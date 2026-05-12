@@ -12,7 +12,7 @@ block content
 
       .chat-body
         .security-banner
-          span Canal cifrado extremo a extremo · Certificado de usuario requerido
+          span Canal cifrado extremo a extremo · Identidades protegidas en base de datos
 
         if !usuarios || usuarios.length === 0
           .empty-chat
@@ -20,7 +20,7 @@ block content
         else
           .contacts-list
             each usuario in usuarios
-              a.contact-card(href=`/message3/chat/${usuario.username}`)
+              a.contact-card(href=`/message3/chat/${usuario.id}`)
                 .contact-name= usuario.username
                 .contact-status
                   span.status-dot
