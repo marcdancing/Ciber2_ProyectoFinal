@@ -1,0 +1,256 @@
+extends layoutDsch
+
+block content
+  .dsch-page
+    .dsch-hero
+      .dsch-nav
+        .dsch-brand
+          .dsch-logo
+            span DS
+          .dsch-brand-text
+            strong
+              span.dsch-acronym DSCH
+              |  Digital Secure Communication Hub
+            span SecureGov Enterprise Suite
+
+        .dsch-nav-actions
+          a.dsch-nav-link(href='/apps') Selector
+          a.dsch-nav-link(href='/auth3/login') Acceder
+          a.dsch-nav-button(href='/auth3/register') Solicitar demo
+
+      .dsch-hero-content
+        .dsch-hero-left
+          .dsch-kicker
+            span Plataforma institucional de comunicación segura
+
+          h1 Comunicación confidencial para entornos críticos.
+
+          p.dsch-hero-text
+            | SecureGov es una plataforma de mensajería institucional diseñada para proteger conversaciones sensibles mediante cifrado extremo a extremo, MFA, certificados criptográficos y protección avanzada de identidades.
+
+          .dsch-hero-actions
+            a.dsch-primary-button(href='/auth3/login')
+              span Entrar en SecureGov
+              strong →
+
+            a.dsch-secondary-button(href='#product')
+              span Ver capacidades
+
+          .dsch-trust-row
+            .dsch-trust-item
+              strong E2EE
+              span Cifrado extremo a extremo
+            .dsch-trust-item
+              strong MFA
+              span Autenticación reforzada
+            .dsch-trust-item
+              strong PKI
+              span Certificados de usuario
+
+        .dsch-hero-card
+          .dsch-card-orbit
+          .dsch-security-panel
+            .dsch-panel-header
+              span Estado del canal
+              strong Seguro
+            .dsch-signal
+              span
+              span
+              span
+            .dsch-panel-main
+              h2 SecureGov
+              p Canal cifrado · Identidad protegida · Certificado activo
+            .dsch-panel-list
+              .dsch-panel-row
+                span Cifrado AES-GCM
+                strong Activo
+              .dsch-panel-row
+                span RSA-OAEP
+                strong Activo
+              .dsch-panel-row
+                span MFA TOTP
+                strong Validado
+              .dsch-panel-row
+                span Protección de identidad
+                strong HMAC + AES
+
+    section#product.dsch-section.dsch-product
+      .dsch-section-heading
+        span Plataforma
+        h2 Una solución para organizaciones que no pueden permitirse comunicaciones débiles.
+        p
+          | Digital Secure Communication Hub comercializa SecureGov como una solución orientada a instituciones, equipos directivos y entornos donde la confidencialidad, la trazabilidad y el control de acceso son requisitos esenciales.
+
+      .dsch-product-grid
+        .dsch-feature-card
+          .dsch-feature-icon 🔐
+          h3 Cifrado extremo a extremo
+          p Los mensajes se cifran en el cliente. El servidor almacena únicamente contenido cifrado y claves protegidas.
+
+        .dsch-feature-card
+          .dsch-feature-icon 🪪
+          h3 Certificados personales
+          p Cada usuario opera con un certificado propio. La clave privada permanece bajo control del usuario y no se envía al servidor.
+
+        .dsch-feature-card
+          .dsch-feature-icon 🛡️
+          h3 Identidades protegidas
+          p Los identificadores de usuario se protegen mediante hashing con pepper y cifrado simétrico para reducir exposición.
+
+        .dsch-feature-card
+          .dsch-feature-icon 🧠
+          h3 Defensa multicapa
+          p Contraseñas bcrypt, MFA, CAPTCHA, control de sesión, recuperación segura y revocación de certificados.
+
+    section.dsch-section.dsch-enterprise
+      .dsch-enterprise-content
+        .dsch-enterprise-copy
+          span.dsch-kicker.dark Producto empresarial
+          h2 Diseñado para proteger información sensible desde el primer mensaje.
+          p
+            | SecureGov combina controles criptográficos, autenticación reforzada y protección de datos identificativos para ofrecer una experiencia de comunicación segura sin depender únicamente de la confianza en el servidor.
+          p
+            | La plataforma permite demostrar cómo una aplicación de mensajería puede evolucionar desde un entorno vulnerable hasta una solución institucional preparada para escenarios exigentes.
+
+        .dsch-enterprise-card
+          h3 Modelo de protección
+          .dsch-enterprise-list
+            .dsch-enterprise-row
+              span 01
+              p Autenticación con contraseña robusta y bcrypt.
+            .dsch-enterprise-row
+              span 02
+              p Segundo factor MFA para acceso y operaciones sensibles.
+            .dsch-enterprise-row
+              span 03
+              p Certificado personal con clave privada cifrada localmente.
+            .dsch-enterprise-row
+              span 04
+              p Mensajería cifrada extremo a extremo.
+            .dsch-enterprise-row
+              span 05
+              p Protección de identidades en base de datos.
+
+    section.dsch-section.dsch-timeline
+      .dsch-section-heading
+        span Arquitectura
+        h2 De una conversación vulnerable a una comunicación institucional.
+        p
+          | SecureGov nace de comparar tres niveles de seguridad y convertir la versión más robusta en un producto presentable.
+
+      .dsch-steps
+        .dsch-step
+          strong 01
+          h3 Identidad
+          p Usuarios protegidos, hashes con pepper y datos sensibles cifrados.
+
+        .dsch-step
+          strong 02
+          h3 Acceso
+          p Contraseña robusta, bcrypt y verificación MFA.
+
+        .dsch-step
+          strong 03
+          h3 Certificado
+          p Clave privada local protegida por passphrase y revocación controlada.
+
+        .dsch-step
+          strong 04
+          h3 Mensaje
+          p Cifrado extremo a extremo con claves de sesión por mensaje.
+
+    section.dsch-section.dsch-reviews
+      .dsch-section-heading
+        span Reseñas institucionales
+        h2 Validación desde distintas áreas de responsabilidad.
+        p
+          | Perfiles técnicos, directivos y de cumplimiento valoran SecureGov desde la seguridad, la privacidad, la experiencia de usuario y la defensa ante auditoría.
+
+      .dsch-reviews-grid
+        .dsch-review-card
+          .dsch-review-number 01
+          p “La plataforma transmite una sensación clara de control: cada acceso, cada certificado y cada mensaje tienen una lógica de protección.”
+          strong Dirección de Seguridad Institucional
+
+        .dsch-review-card
+          .dsch-review-number 02
+          p “El uso de certificados personales aporta una capa muy convincente para entornos donde la identidad del usuario es crítica.”
+          strong Responsable de Gobierno Digital
+
+        .dsch-review-card
+          .dsch-review-number 03
+          p “SecureGov convierte una app de mensajería en una herramienta defendible ante auditoría.”
+          strong Consultoría ISO 27001
+
+        .dsch-review-card
+          .dsch-review-number 04
+          p “Nos gustó especialmente que el servidor no almacene mensajes en claro.”
+          strong Equipo de Cumplimiento Normativo
+
+        .dsch-review-card
+          .dsch-review-number 05
+          p “El MFA y la revocación de certificados encajan muy bien con escenarios de riesgo real.”
+          strong Oficina de Riesgos Tecnológicos
+
+        .dsch-review-card
+          .dsch-review-number 06
+          p “Es una solución pedagógica y técnica al mismo tiempo: se entiende la evolución desde la inseguridad hasta la protección avanzada.”
+          strong Departamento de Formación Ciber
+
+        .dsch-review-card
+          .dsch-review-number 07
+          p “La separación entre contraseña de cuenta y passphrase del certificado está muy bien planteada.”
+          strong Arquitectura de Seguridad
+
+        .dsch-review-card
+          .dsch-review-number 08
+          p “La protección de identidades en base de datos reduce exposición incluso si se analiza la colección directamente.”
+          strong Analista de Privacidad
+
+        .dsch-review-card
+          .dsch-review-number 09
+          p “La interfaz permite explicar conceptos complejos sin perder claridad.”
+          strong Coordinación de Transformación Digital
+
+        .dsch-review-card
+          .dsch-review-number 10
+          p “El producto tiene una narrativa sólida: seguridad por capas, no como medida aislada.”
+          strong Comité Ejecutivo
+
+        .dsch-review-card
+          .dsch-review-number 11
+          p “La actualización dinámica de mensajes mejora mucho la experiencia sin romper el modelo de cifrado.”
+          strong Equipo de Producto
+
+        .dsch-review-card
+          .dsch-review-number 12
+          p “La recuperación mediante MFA refuerza el control de cuenta sin simplificar en exceso el proceso.”
+          strong Responsable IAM
+
+        .dsch-review-card
+          .dsch-review-number 13
+          p “El sistema de CAPTCHA propio es un buen elemento demostrativo contra automatización básica.”
+          strong Laboratorio de Ciberseguridad
+
+        .dsch-review-card
+          .dsch-review-number 14
+          p “La revocación de certificado está explicada con honestidad: protege a futuro, sin prometer recuperar lo irrecuperable.”
+          strong Auditor Técnico
+
+        .dsch-review-card
+          .dsch-review-number 15
+          p “Una propuesta elegante, completa y fácil de defender en una exposición.”
+          strong Tribunal Académico
+
+    section.dsch-section.dsch-cta
+      .dsch-cta-box
+        span SecureGov Enterprise Suite
+        h2 Empieza la demostración segura.
+        p
+          | Accede al producto y muestra cómo una aplicación de mensajería puede evolucionar hacia un entorno institucional protegido.
+        .dsch-cta-actions
+          a.dsch-primary-button(href='/auth3/login')
+            span Acceder a SecureGov
+            strong →
+          a.dsch-secondary-button.light(href='/apps')
+            span Volver al selector

@@ -46,6 +46,9 @@ app.use((req, res, next) => {
     const allowedPrefixes = [
       '/auth3',
       '/message3',
+      '/apps',
+      '/digital-secure-communication-hub',
+      '/dsch',
       '/stylesheets',
       '/javascripts',
       '/images'
@@ -109,6 +112,22 @@ app.get('/', (req, res) => {
   res.render('appSelector', {
     title: 'Selector de aplicaciones'
   });
+});
+
+app.get('/apps', (req, res) => {
+  res.render('appSelector', {
+    title: 'Selector de aplicaciones'
+  });
+});
+
+app.get('/digital-secure-communication-hub', (req, res) => {
+  res.render('dsch', {
+    title: 'Digital Secure Communication Hub'
+  });
+});
+
+app.get('/dsch', (req, res) => {
+  res.redirect('/digital-secure-communication-hub');
 });
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {

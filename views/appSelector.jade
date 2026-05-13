@@ -1,4 +1,4 @@
-extends layoutApps 
+extends layoutApps
 
 block content
   .selector-page
@@ -6,85 +6,110 @@ block content
       header.selector-header
         .selector-brand
           .selector-logo
-            span 🛡️
+            span SG
           .selector-brand-text
             strong Proyecto SecureGov
-            span Ciberseguridad & Privacidad
+            span Laboratorio de ciberseguridad aplicada
 
-        .selector-header-badge
-          span Seguridad como prioridad
+        .selector-header-actions
+          .selector-header-badge
+            span Comparativa de seguridad
+          a.selector-header-link(href='/digital-secure-communication-hub') Ver SecureGov
 
       main.selector-main
-        .selector-title-block
-          h1 Selector de aplicaciones
-          .selector-divider
-            span
-          p Demostración comparativa de seguridad entre tres versiones de una aplicación de mensajería.
+        .selector-hero
+          .selector-kicker
+            span Evolucion de una aplicacion vulnerable a un producto institucional
+          h1 Tres niveles de seguridad. Una misma conversacion.
+          p
+            | Explora la progresion tecnica del proyecto: desde una mensajeria expuesta hasta SecureGov, una plataforma con MFA, certificados, cifrado extremo a extremo y proteccion de identidades.
+
+        .selector-comparison
+          .comparison-item
+            strong 01
+            span Vulnerable
+          .comparison-line
+          .comparison-item
+            strong 02
+            span Intermedia
+          .comparison-line
+          .comparison-item
+            strong 03
+            span Institucional
 
         .apps-grid
           .app-card.app-card-low
-            .app-card-glow
-            .app-icon.app-icon-low
-              span 🔓
+            .app-card-top
+              .app-icon.app-icon-low
+                span !
+              .app-level.level-low Seguridad baja
 
-            h2 Aplicación 1
-
-            .app-level.level-low Seguridad baja
-
+            h2 Aplicacion 1
             p.app-description
-              | Versión vulnerable e insegura. Sin autenticación robusta, sin cifrado extremo a extremo y con mayor exposición ante ataques.
+              | Version vulnerable para demostrar riesgos reales: autenticacion debil, ausencia de cifrado extremo a extremo y mayor exposicion de datos.
 
             ul.app-features
-              li Sin protección avanzada
-              li Mayor riesgo de exposición
+              li Sin controles avanzados
+              li Datos mas expuestos
               li Entorno demostrativo vulnerable
 
-            a.app-button.app-button-low(href='/message1')
-              span.button-icon →
-              span Entrar en la App 1
+            .app-card-footer
+              .app-risk-meter
+                span
+                span
+                span
+              a.app-button.app-button-low(href='/message1')
+                span Entrar en la App 1
+                strong ->
 
           .app-card.app-card-medium
-            .app-card-glow
-            .app-icon.app-icon-medium
-              span 🔐
+            .app-card-top
+              .app-icon.app-icon-medium
+                span +
+              .app-level.level-medium Seguridad media
 
-            h2 Aplicación 2
-
-            .app-level.level-medium Seguridad media
-
+            h2 Aplicacion 2
             p.app-description
-              | Versión intermedia con autenticación, sesiones y almacenamiento en base de datos, pero todavía sin protección completa.
+              | Version intermedia con login, sesiones y persistencia en base de datos. Mejora el control de acceso, pero todavia no cubre todos los escenarios sensibles.
 
             ul.app-features
               li Login y sesiones
-              li Control básico de acceso
+              li Control de acceso basico
               li Riesgo moderado
 
-            a.app-button.app-button-medium(href='/auth2/login')
-              span.button-icon →
-              span Entrar en la App 2
+            .app-card-footer
+              .app-risk-meter
+                span
+                span
+                span.muted
+              a.app-button.app-button-medium(href='/auth2/login')
+                span Entrar en la App 2
+                strong ->
 
           .app-card.app-card-high
-            .app-card-glow
-            .app-icon.app-icon-high
-              span ✅
+            .app-card-top
+              .app-icon.app-icon-high
+                span DS
+              .app-level.level-high Seguridad alta
 
-            h2 Aplicación 3
-
-            .app-level.level-high Seguridad alta
-
+            h2 SecureGov
             p.app-description
-              | Versión segura con MFA, certificados de usuario, cifrado extremo a extremo, bcrypt, CAPTCHA y protección de identidades.
+              | Producto institucional de Digital Secure Communication Hub, con MFA, certificados personales, cifrado extremo a extremo, CAPTCHA y proteccion de identidades.
 
             ul.app-features
               li MFA y bcrypt
               li Cifrado extremo a extremo
-              li Certificado criptográfico
+              li Certificado criptografico
 
-            a.app-button.app-button-high(href='/auth3/login')
-              span.button-icon →
-              span Entrar en la App 3
+            .app-card-footer
+              .app-risk-meter
+                span
+                span.muted
+                span.muted
+              a.app-button.app-button-high(href='/digital-secure-communication-hub')
+                span Presentar SecureGov
+                strong ->
 
         .selector-note
           span.info-icon i
-          p Este entorno es solo demostrativo. Las tres aplicaciones permiten comparar diferentes niveles de seguridad.
+          p Primero muestra la comparativa. Despues entra en SecureGov para defender la version institucional del proyecto.
